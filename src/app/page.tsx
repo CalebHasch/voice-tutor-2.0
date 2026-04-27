@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 
 type Message = {
   role: "user" | "assistant";
@@ -13,10 +14,15 @@ export default function Home() {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (overrideText?: string) => {
+    const messageText = overrideText ?? input;
 
-    const newMessages = [...messages, { role: "user", content: input }];
+    if (!messageText.trim()) return;
+
+    const newMessages: Message[] = [
+      ...messages,
+      { role: "user", content: messageText },
+    ];
 
     setMessages(newMessages);
     setInput("");
@@ -28,8 +34,22 @@ export default function Home() {
 
     const data = await res.json();
 
-    setMessages((prev) => [...prev, data]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: data.content },
+    ]);
   };
+
+  const {
+    isRecording,
+    transcript,
+    toggleRecording,
+    error: speechError,
+    silenceTimeout,
+    setSilenceTimeout,
+  } = useSpeechRecognition(async (text) => {
+    await sendMessage(text);
+  });
 
   // Auto-scroll
   useEffect(() => {
@@ -71,24 +91,62 @@ export default function Home() {
         </div>
       </div>
 
+      {isRecording && (
+        <div className="text-xs text-red-500 px-1">Listening...</div>
+      )}
+
       {/* Input */}
       <div className="border-t bg-white p-4">
-        <div className="mx-auto flex max-w-3xl gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask MentorAI anything..."
-            className="flex-1 rounded-xl border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") sendMessage();
-            }}
-          />
-          <button
-            onClick={sendMessage}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            Send
-          </button>
+        <div className="mx-auto max-w-3xl space-y-2">
+          {/* Voice Settings */}
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>Pause:</span>
+            <input
+              type="range"
+              min={1000}
+              max={10000}
+              step={500}
+              value={silenceTimeout}
+              onChange={(e) => setSilenceTimeout(Number(e.target.value))}
+            />
+            <span>{(silenceTimeout / 1000).toFixed(1)}s</span>
+          </div>
+
+          {/* Input Row */}
+          <div className="flex gap-2">
+            <input
+              value={transcript || input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask MentorAI anything..."
+              className="flex-1 rounded-xl border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendMessage();
+              }}
+            />
+
+            {/* Mic Button */}
+            <button
+              onClick={toggleRecording}
+              className={`rounded-xl px-3 text-lg ${
+                isRecording
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-gray-200"
+              }`}
+            >
+              🎤
+            </button>
+
+            <button
+              onClick={() => sendMessage()}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-white"
+            >
+              Send
+            </button>
+          </div>
+
+          {speechError && (
+            <div className="text-sm text-red-500">{speechError}</div>
+          )}
         </div>
       </div>
     </div>
