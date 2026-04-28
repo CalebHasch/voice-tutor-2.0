@@ -1,12 +1,22 @@
-import { openai } from "@/lib/openai";
+import { tutorGraph } from "@/lib/tutorGraph";
+import { TutorState } from "@/lib/tutorState";
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const body = await req.json();
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-2024-08-06",
-    messages,
+  const inputState: Partial<TutorState> = {
+    topic: body.topic,
+    step: body.step ?? "subtopic-generation",
+    subtopics: body.subtopics ?? [],
+    currentSubtopicIndex: body.currentSubtopicIndex ?? 0,
+    currentMainQuestionIndex: body.currentMainQuestionIndex ?? 0,
+    sessionFeedback: body.sessionFeedback ?? "",
+    recommendations: body.recommendations ?? [],
+  };
+
+  const result = await tutorGraph.invoke(inputState, {
+    configurable: { thread_id: body.threadId },
   });
 
-  return Response.json(response.choices[0].message);
+  return Response.json(result);
 }
