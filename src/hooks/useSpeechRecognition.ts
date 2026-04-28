@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 type SpeechRecognitionType = typeof window.SpeechRecognition;
 
 interface SpeechRecognitionEvent extends Event {
@@ -25,15 +32,18 @@ export function useSpeechRecognition(
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fullTranscriptRef = useRef("");
+  const isStoppingRef = useRef(false);
+  const isRecordingRef = useRef(false);
+
+  function setRecording(val: boolean) {
+    isRecordingRef.current = val;
+    setIsRecording(val);
+  }
 
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setError("Speech recognition not supported in this browser.");
-      return;
-    }
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -41,11 +51,18 @@ export function useSpeechRecognition(
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
-      setIsRecording(true);
+      setRecording(true);
       setTranscript("");
       fullTranscriptRef.current = "";
       resetSilenceTimer();
     };
+
+    recognition.onspeechend = () => {
+      stopRecording();
+    };
+
+    recognition.onaudiostart = resetSilenceTimer;
+    recognition.onsoundstart = resetSilenceTimer;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
@@ -60,7 +77,6 @@ export function useSpeechRecognition(
       }
 
       setTranscript((fullTranscriptRef.current + interim).trim());
-      resetSilenceTimer();
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -69,17 +85,17 @@ export function useSpeechRecognition(
     };
 
     recognition.onend = async () => {
+      isStoppingRef.current = false;
       clearSilenceTimer();
 
       const finalText = fullTranscriptRef.current.trim();
+      setTranscript("");
+      fullTranscriptRef.current = "";
+      setRecording(false);
 
       if (finalText) {
-        setTranscript("");
-        fullTranscriptRef.current = "";
-        setIsRecording(false);
-
         try {
-          await handleSend(finalText);
+          await handleSendRef.current(finalText);
         } catch (err) {
           console.error("Error sending voice text:", err);
         }
@@ -93,6 +109,20 @@ export function useSpeechRecognition(
       recognition.stop();
     };
   }, []);
+
+  useEffect(() => {
+    const supported =
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+    if (!supported) {
+      setError("Speech recognition not supported in this browser.");
+    }
+  }, []);
+
+  const handleSendRef = useRef(handleSend);
+
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
 
   useEffect(() => {
     silenceTimeoutRef.current = silenceTimeout;
@@ -113,7 +143,7 @@ export function useSpeechRecognition(
   }
 
   function startRecording() {
-    if (!recognitionRef.current || isRecording) return;
+    if (!recognitionRef.current || isRecordingRef.current) return;
 
     setTranscript("");
     fullTranscriptRef.current = "";
@@ -121,7 +151,7 @@ export function useSpeechRecognition(
 
     try {
       recognitionRef.current.start();
-      setIsRecording(true);
+      setRecording(true);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -130,9 +160,15 @@ export function useSpeechRecognition(
   }
 
   function stopRecording() {
-    if (!recognitionRef.current || !isRecording) return;
+    if (
+      !recognitionRef.current ||
+      !isRecordingRef.current ||
+      isStoppingRef.current
+    )
+      return;
 
-    setIsRecording(false);
+    isStoppingRef.current = true;
+    setRecording(false);
     clearSilenceTimer();
 
     try {
@@ -145,7 +181,7 @@ export function useSpeechRecognition(
   }
 
   function toggleRecording() {
-    isRecording ? stopRecording() : startRecording();
+    isRecordingRef.current ? stopRecording() : startRecording();
   }
 
   return {
