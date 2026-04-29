@@ -32,11 +32,17 @@ export type TutorStep =
 export const TutorAnnotation = Annotation.Root({
   step: Annotation<TutorStep>,
   topic: Annotation<string>,
-  subtopics: Annotation<Subtopic[]>,
+  subtopics: Annotation<Subtopic[]>({
+    reducer: (_, next) => next,
+    default: () => [],
+  }),
   currentSubtopicIndex: Annotation<number>,
   currentMainQuestionIndex: Annotation<number>,
   sessionFeedback: Annotation<string>,
-  recommendations: Annotation<string[]>,
+  recommendations: Annotation<string[]>({
+    reducer: (_, next) => next,
+    default: () => [],
+  }),
 });
 
 export type TutorState = typeof TutorAnnotation.State;
