@@ -7,11 +7,7 @@ export type FollowUp = {
   score: "correct" | "partial" | "incorrect";
 };
 
-export type MainQuestion = {
-  question: string;
-  userResponse: string;
-  feedback: string;
-  score: "correct" | "partial" | "incorrect";
+export type MainQuestion = FollowUp & {
   consecutiveWrongCount: number;
   followups: FollowUp[];
 };
@@ -31,7 +27,16 @@ export type TutorStep =
 
 export const TutorAnnotation = Annotation.Root({
   step: Annotation<TutorStep>,
+  pendingStep: Annotation<TutorStep | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
   topic: Annotation<string>,
+  // Pre selection subtopics
+  allSubtopics: Annotation<Subtopic[]>({
+    reducer: (_, next) => next,
+    default: () => [],
+  }),
   subtopics: Annotation<Subtopic[]>({
     reducer: (_, next) => next,
     default: () => [],

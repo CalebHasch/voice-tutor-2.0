@@ -29,8 +29,12 @@ export async function sessionRouterNode(state: TutorState): Promise<Command> {
     ].userResponse = userResponse;
 
     return new Command({
-      goto: "evaluator",
-      update: { subtopics: updatedSubtopics, step: "question-feedback" },
+      goto: "responseValidator",
+      update: {
+        subtopics: updatedSubtopics,
+        step: "question-feedback",
+        pendingStep: state.step,
+      },
     });
   }
 
@@ -56,11 +60,15 @@ export async function sessionRouterNode(state: TutorState): Promise<Command> {
     ].followups[followupIndex].userResponse = userResponse;
 
     return new Command({
-      goto: "evaluator",
-      update: { subtopics: updatedSubtopics, step: "question-feedback" },
+      goto: "responseValidator",
+      update: {
+        subtopics: updatedSubtopics,
+        step: "question-feedback",
+        pendingStep: state.step,
+      },
     });
   }
 
   // Fallback — should not be reached
-  return new Command({ goto: "evaluator" });
+  return new Command({ goto: "responseValidator" });
 }

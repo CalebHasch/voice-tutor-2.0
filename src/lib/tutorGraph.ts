@@ -1,7 +1,11 @@
 import { StateGraph, START, END, MemorySaver } from "@langchain/langgraph";
 import { TutorAnnotation } from "./tutorState";
-import { subtopicGeneratorNode } from "./nodes/subtopicGenerator";
+import {
+  subtopicGeneratorNode,
+  subtopicSelectorNode,
+} from "./nodes/subtopicGenerator";
 import { mainQuestionGeneratorNode } from "./nodes/mainQuestionGenerator";
+import { responseValidatorNode } from "./nodes/responseValidator";
 import { sessionRouterNode } from "./nodes/sessionRouter";
 import { evaluatorNode } from "./nodes/evaluator";
 import { followupGeneratorNode } from "./nodes/followupGenerator";
@@ -11,8 +15,12 @@ const checkpointer = new MemorySaver();
 
 export const tutorGraph = new StateGraph(TutorAnnotation)
   .addNode("subtopicGenerator", subtopicGeneratorNode)
+  .addNode("subtopicSelector", subtopicSelectorNode)
   .addNode("mainQuestionGenerator", mainQuestionGeneratorNode)
-  .addNode("sessionRouter", sessionRouterNode, { ends: ["evaluator"] })
+  .addNode("responseValidator", responseValidatorNode, {
+    ends: ["evaluator", "sessionRouter"],
+  })
+  .addNode("sessionRouter", sessionRouterNode, { ends: ["responseValidator"] })
   .addNode("evaluator", evaluatorNode, {
     ends: ["sessionRouter", "followupGenerator", "sessionEnd"],
   })
@@ -21,10 +29,11 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
 
   // Initial flow
   .addEdge(START, "subtopicGenerator")
-  .addEdge("subtopicGenerator", "mainQuestionGenerator")
-  .addEdge("mainQuestionGenerator", "sessionRouter")
+  .addEdge("subtopicGenerator", "subtopicSelector")
+  .addEdge("subtopicSelector", "mainQuestionGenerator")
 
-  // After generating a followup, go back to router to ask it
+  // Question flow (handled by sessionRouter)
+  .addEdge("mainQuestionGenerator", "sessionRouter")
   .addEdge("followupGenerator", "sessionRouter")
 
   // evaluator and sessionFeedback use Command for dynamic routing (no edges needed)

@@ -1,6 +1,6 @@
 import { openai } from "@/lib/openai";
 import { TutorState } from "@/lib/tutorState";
-import { Command } from "@langchain/langgraph";
+import { Command, interrupt } from "@langchain/langgraph";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
@@ -99,7 +99,7 @@ Student's response: ${userResponse}`,
         };
       } else {
         return {
-          goto: "sessionFeedback",
+          goto: "sessionEnd",
           nextSubtopicIdx: currentSubtopicIndex,
           nextQuestionIdx: currentMainQuestionIndex,
           step: "session-complete" as const,
@@ -142,6 +142,19 @@ Student's response: ${userResponse}`,
   }
 
   const { goto, nextSubtopicIdx, nextQuestionIdx, step } = getNextStep();
+
+  const isEncouragement =
+    isFollowup && score !== "correct" && q.consecutiveWrongCount >= 2;
+
+  interrupt({
+    type: "feedback",
+    score,
+    feedback,
+    isEncouragement,
+    message: isEncouragement
+      ? `${feedback}\n\nKeep going — let's move to the next question.`
+      : feedback,
+  });
 
   return new Command({
     goto,

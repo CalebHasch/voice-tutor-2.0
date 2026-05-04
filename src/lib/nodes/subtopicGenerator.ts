@@ -1,5 +1,5 @@
 import { openai } from "@/lib/openai";
-import { TutorState } from "@/lib/tutorState";
+import { Subtopic, TutorState } from "@/lib/tutorState";
 import { interrupt } from "@langchain/langgraph";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
@@ -31,20 +31,30 @@ export async function subtopicGeneratorNode(
     JSON.parse(response.choices[0].message.content ?? "{}"),
   );
 
-  const subtopics = parsed.subtopics.map((name) => ({
+  const allSubtopics = parsed.subtopics.map((name) => ({
     name,
     mainQuestions: [],
   }));
 
-  // Interrupt and present subtopics to user for selection
+  return {
+    allSubtopics,
+    step: "subtopic-generation",
+  };
+}
+
+export async function subtopicSelectorNode(
+  state: TutorState,
+): Promise<Partial<TutorState>> {
+  const subtopicNames = state.allSubtopics.map((s: Subtopic) => s.name);
+
   const selectedNames: string[] = interrupt({
     type: "subtopic-selection",
     message:
       "Here are the subtopics for this session. Please select 1–4 to focus on.",
-    subtopics: parsed.subtopics,
+    subtopics: subtopicNames,
   });
 
-  const selectedSubtopics = subtopics.filter((s) =>
+  const selectedSubtopics = state.allSubtopics.filter((s: Subtopic) =>
     selectedNames.includes(s.name),
   );
 
