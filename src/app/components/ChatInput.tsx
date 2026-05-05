@@ -9,7 +9,7 @@ interface ChatInputProps {
   isLoading: boolean;
   placeholder?: string;
   voiceEnabled: boolean;
-  setVoiceEnabled: (val: boolean) => void;
+  setVoiceEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export default function ChatInput({

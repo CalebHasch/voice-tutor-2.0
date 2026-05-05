@@ -196,7 +196,7 @@ export default function Home() {
     const cleanText = lastMessage.content.replace(/[#*_`]/g, "");
 
     speak(cleanText);
-  }, [messages, voiceEnabled]);
+  }, [messages, voiceEnabled, speak, stop]);
 
   if (!topic) return <TopicSelector onSelect={setTopic} />;
 

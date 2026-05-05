@@ -13,7 +13,7 @@ interface ChatWindowProps {
   recommendations: string[];
   selectedSubtopics: string[];
   voiceEnabled: boolean;
-  setVoiceEnabled: (val: boolean) => void;
+  setVoiceEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   onSend: (text: string) => void;
   onSubtopicToggle: (name: string) => void;
   onSubtopicsSubmit: () => void;
