@@ -139,8 +139,8 @@ export default function Home() {
     callApi(text);
   }
 
-  // Called by ChatWindow after fade animation completes
-  function handleContinue() {
+  function handleContinue(shouldClear: boolean) {
+    if (shouldClear) setMessages([]);
     callApi("continue");
   }
 
@@ -161,6 +161,7 @@ export default function Home() {
       { role: "user", content: `Selected: ${selectedSubtopics.join(", ")}` },
     ]);
     setSelectedSubtopics([]);
+    setMessages([]);
     callApi(selectedSubtopics);
   }
 

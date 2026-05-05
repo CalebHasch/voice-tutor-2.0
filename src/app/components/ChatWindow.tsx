@@ -17,8 +17,7 @@ interface ChatWindowProps {
   onSend: (text: string) => void;
   onSubtopicToggle: (name: string) => void;
   onSubtopicsSubmit: () => void;
-  onContinue: () => void;
-  // Progress info
+  onContinue: (shouldClear: boolean) => void;
   subtopicName: string;
   subtopicIndex: number;
   subtopicTotal: number;
@@ -93,13 +92,23 @@ export default function ChatWindow({
 
   // Fade out then call onContinue for feedback that ends a main question thread
   function handleContinue() {
-    setFading(true);
-    setTimeout(() => {
-      setFading(false);
-      onContinue();
-    }, 350);
-  }
+    const shouldClear =
+      isFeedback &&
+      ((interrupt as Extract<InterruptPayload, { type: "feedback" }>).score ===
+        "correct" ||
+        (interrupt as Extract<InterruptPayload, { type: "feedback" }>)
+          .consecutiveWrongCount >= 2);
 
+    if (shouldClear) {
+      setFading(true);
+      setTimeout(() => {
+        setFading(false);
+        onContinue(true);
+      }, 350);
+    } else {
+      onContinue(false);
+    }
+  }
   return (
     <>
       <style>{`
@@ -275,7 +284,7 @@ export default function ChatWindow({
           <div className="message-appear pl-9 pt-1">
             {isIncomplete ? (
               <button
-                onClick={() => onContinue()}
+                onClick={() => onContinue(false)}
                 className="send-btn rounded-xl px-4 py-2 text-sm font-medium text-white"
               >
                 Try again →

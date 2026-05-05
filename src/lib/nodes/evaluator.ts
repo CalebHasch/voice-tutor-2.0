@@ -2,6 +2,7 @@ import { openai } from "@/lib/openai";
 import { TutorState } from "@/lib/tutorState";
 import { Command, interrupt } from "@langchain/langgraph";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { withRetry } from "@/lib/withRetry";
 import { z } from "zod";
 
 const EvaluationSchema = z.object({
@@ -22,59 +23,81 @@ export async function evaluatorNode(state: TutorState): Promise<Command> {
     currentQuestion.followups[currentQuestion.followups.length - 1].feedback ===
       "";
 
-  const questionText = isFollowup
-    ? currentQuestion.followups[currentQuestion.followups.length - 1].question
-    : currentQuestion.question;
-  const userResponse = isFollowup
-    ? currentQuestion.followups[currentQuestion.followups.length - 1]
-        .userResponse
-    : currentQuestion.userResponse;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-2024-08-06",
-    response_format: zodResponseFormat(EvaluationSchema, "evaluation"),
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert tutor evaluating a student's response.
-        Score as:
-        - "correct": student demonstrates solid understanding
-        - "partial": student shows some understanding but misses key concepts  
-        - "incorrect": student misunderstands or doesn't know the material
-        Provide concise, constructive feedback (2-3 sentences).`,
-      },
-      {
-        role: "user",
-        content: `Topic: ${state.topic}
-Subtopic: ${currentSubtopic.name}
-Question: ${questionText}
-Student's response: ${userResponse}`,
-      },
-    ],
-  });
-
-  const { score, feedback } = EvaluationSchema.parse(
-    JSON.parse(response.choices[0].message.content ?? "{}"),
-  );
-
   const updatedSubtopics = structuredClone(subtopics);
   const q =
     updatedSubtopics[currentSubtopicIndex].mainQuestions[
       currentMainQuestionIndex
     ];
 
-  if (isFollowup) {
-    const lastFollowup = q.followups[q.followups.length - 1];
-    lastFollowup.score = score;
-    lastFollowup.feedback = feedback;
-  } else {
-    q.score = score;
-    q.feedback = feedback;
-  }
+  // ── Check if we already evaluated
+  const alreadyEvaluated = isFollowup
+    ? q.followups[q.followups.length - 1].feedback !== ""
+    : q.feedback !== "";
 
-  // ── Routing logic ────────────────────────────────────────────────
-  const totalSubtopics = updatedSubtopics.length;
-  const totalMainQuestions = currentSubtopic.mainQuestions.length;
+  let score: "correct" | "partial" | "incorrect";
+  let feedback: string;
+
+  if (alreadyEvaluated) {
+    // Re-running after resume — read saved values from state, skip LLM call
+    if (isFollowup) {
+      const lastFollowup = q.followups[q.followups.length - 1];
+      score = lastFollowup.score;
+      feedback = lastFollowup.feedback;
+    } else {
+      score = q.score;
+      feedback = q.feedback;
+    }
+  } else {
+    // First run — call LLM and save result to state
+    const questionText = isFollowup
+      ? currentQuestion.followups[currentQuestion.followups.length - 1].question
+      : currentQuestion.question;
+    const userResponse = isFollowup
+      ? currentQuestion.followups[currentQuestion.followups.length - 1]
+          .userResponse
+      : currentQuestion.userResponse;
+
+    const result = await withRetry(async () => {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-2024-08-06",
+        response_format: zodResponseFormat(EvaluationSchema, "evaluation"),
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert tutor evaluating a student's response.
+            Score as:
+            - "correct": student demonstrates solid understanding
+            - "partial": student shows some understanding but misses key concepts
+            - "incorrect": student misunderstands or doesn't know the material
+            Provide concise, constructive feedback (2-3 sentences).`,
+          },
+          {
+            role: "user",
+            content: `Topic: ${state.topic}
+Subtopic: ${currentSubtopic.name}
+Question: ${questionText}
+Student's response: ${userResponse}`,
+          },
+        ],
+      });
+      return EvaluationSchema.parse(
+        JSON.parse(response.choices[0].message.content ?? "{}"),
+      );
+    });
+
+    score = result.score;
+    feedback = result.feedback;
+
+    // Write to state immediately so re-run can detect it
+    if (isFollowup) {
+      const lastFollowup = q.followups[q.followups.length - 1];
+      lastFollowup.score = score;
+      lastFollowup.feedback = feedback;
+    } else {
+      q.score = score;
+      q.feedback = feedback;
+    }
+  }
 
   function getNextStep(): {
     goto: string;
@@ -82,6 +105,10 @@ Student's response: ${userResponse}`,
     nextQuestionIdx: number;
     step: TutorState["step"];
   } {
+    const totalSubtopics = updatedSubtopics.length;
+    const totalMainQuestions =
+      updatedSubtopics[currentSubtopicIndex].mainQuestions.length;
+
     const advanceQuestion = () => {
       if (currentMainQuestionIndex + 1 < totalMainQuestions) {
         return {
@@ -108,41 +135,28 @@ Student's response: ${userResponse}`,
     };
 
     if (!isFollowup) {
-      // Main question evaluation
-      if (score === "correct") {
-        return advanceQuestion();
-      } else {
-        // Needs a followup
-        return {
-          goto: "followupGenerator",
-          nextSubtopicIdx: currentSubtopicIndex,
-          nextQuestionIdx: currentMainQuestionIndex,
-          step: "asking-followup" as const,
-        };
-      }
+      if (score === "correct") return advanceQuestion();
+      return {
+        goto: "followupGenerator",
+        nextSubtopicIdx: currentSubtopicIndex,
+        nextQuestionIdx: currentMainQuestionIndex,
+        step: "asking-followup" as const,
+      };
     } else {
-      // Followup evaluation
-      if (score === "correct") {
-        return advanceQuestion();
-      } else {
-        q.consecutiveWrongCount += 1;
-        if (q.consecutiveWrongCount >= 2) {
-          // 2 wrong in a row — give encouragement and move on
-          return advanceQuestion();
-        } else {
-          return {
-            goto: "followupGenerator",
-            nextSubtopicIdx: currentSubtopicIndex,
-            nextQuestionIdx: currentMainQuestionIndex,
-            step: "asking-followup" as const,
-          };
-        }
-      }
+      if (score === "correct") return advanceQuestion();
+      q.consecutiveWrongCount += 1;
+      if (q.consecutiveWrongCount >= 2) return advanceQuestion();
+      return {
+        goto: "followupGenerator",
+        nextSubtopicIdx: currentSubtopicIndex,
+        nextQuestionIdx: currentMainQuestionIndex,
+        step: "asking-followup" as const,
+      };
     }
   }
 
+  // ── Routing logic (unchanged) ────────────────────────────────────
   const { goto, nextSubtopicIdx, nextQuestionIdx, step } = getNextStep();
-
   const isEncouragement =
     isFollowup && score !== "correct" && q.consecutiveWrongCount >= 2;
 
@@ -151,6 +165,7 @@ Student's response: ${userResponse}`,
     score,
     feedback,
     isEncouragement,
+    consecutiveWrongCount: q.consecutiveWrongCount,
     message: isEncouragement
       ? `${feedback}\n\nKeep going — let's move to the next question.`
       : feedback,

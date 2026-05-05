@@ -17,6 +17,7 @@ export type InterruptPayload =
       score: "correct" | "partial" | "incorrect";
       feedback: string;
       isEncouragement: boolean;
+      consecutiveWrongCount: number;
       message: string;
     }
   | { type: "incomplete-response"; message: string };
