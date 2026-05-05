@@ -12,6 +12,8 @@ interface ChatWindowProps {
   sessionComplete: boolean;
   recommendations: string[];
   selectedSubtopics: string[];
+  voiceEnabled: boolean;
+  setVoiceEnabled: (val: boolean) => void;
   onSend: (text: string) => void;
   onSubtopicToggle: (name: string) => void;
   onSubtopicsSubmit: () => void;
@@ -55,6 +57,8 @@ export default function ChatWindow({
   sessionComplete,
   recommendations,
   selectedSubtopics,
+  voiceEnabled,
+  setVoiceEnabled,
   onSend,
   onSubtopicToggle,
   onSubtopicsSubmit,
@@ -316,6 +320,8 @@ export default function ChatWindow({
             onSend={onSend}
             disabled={!isQuestion}
             isLoading={isLoading}
+            voiceEnabled={voiceEnabled}
+            setVoiceEnabled={setVoiceEnabled}
           />
         )}
     </>

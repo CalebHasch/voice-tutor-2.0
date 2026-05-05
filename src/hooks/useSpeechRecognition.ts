@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    SpeechRecognition: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    webkitSpeechRecognition: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 }
 
@@ -57,14 +57,10 @@ export function useSpeechRecognition(
       resetSilenceTimer();
     };
 
-    recognition.onspeechend = () => {
-      stopRecording();
-    };
-
-    recognition.onaudiostart = resetSilenceTimer;
     recognition.onsoundstart = resetSilenceTimer;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      resetSilenceTimer();
       let interim = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {

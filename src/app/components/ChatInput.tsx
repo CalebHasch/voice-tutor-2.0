@@ -8,6 +8,8 @@ interface ChatInputProps {
   disabled: boolean;
   isLoading: boolean;
   placeholder?: string;
+  voiceEnabled: boolean;
+  setVoiceEnabled: (val: boolean) => void;
 }
 
 export default function ChatInput({
@@ -15,8 +17,12 @@ export default function ChatInput({
   disabled,
   isLoading,
   placeholder = "Type your answer…",
+  voiceEnabled,
+  setVoiceEnabled,
 }: ChatInputProps) {
   const [typedInput, setTypedInput] = useState("");
+  const [autoSend, setAutoSend] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   const {
     isRecording,
@@ -26,11 +32,15 @@ export default function ChatInput({
     silenceTimeout,
     setSilenceTimeout,
   } = useSpeechRecognition(async (text) => {
-    onSend(text);
+    if (autoSend) {
+      onSend(text);
+    } else {
+      setTypedInput(text);
+    }
   });
 
   // Show live transcript while recording, otherwise show typed input
-  const displayValue = isRecording ? transcript : typedInput;
+  const displayValue = isRecording ? transcript : typedInput || transcript;
 
   function handleSend() {
     const text = displayValue.trim();
@@ -42,21 +52,66 @@ export default function ChatInput({
   return (
     <div className="mt-4 space-y-2">
       {/* Voice settings */}
-      <div className="flex items-center gap-2 text-xs text-stone-400 px-1">
-        <span>Silence timeout:</span>
-        <input
-          type="range"
-          min={1000}
-          max={10000}
-          step={500}
-          value={silenceTimeout}
-          onChange={(e) => setSilenceTimeout(Number(e.target.value))}
-          className="accent-amber-600"
-        />
-        <span className="tabular-nums">
-          {(silenceTimeout / 1000).toFixed(1)}s
-        </span>
+      <div className="flex justify-between items-center px-1">
+        <button
+          onClick={() => setShowSettings((s) => !s)}
+          className="text-xs text-stone-400 hover:text-stone-600 transition"
+        >
+          ⚙️ Settings
+        </button>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-3 text-xs text-stone-600">
+          {/* AI Voice Toggle */}
+          <div className="flex items-center justify-between">
+            <span>AI Voice</span>
+            <button
+              onClick={() => setVoiceEnabled((v) => !v)}
+              className={`px-2 py-0.5 rounded-full text-xs ${
+                voiceEnabled
+                  ? "bg-amber-500 text-white"
+                  : "bg-stone-200 text-stone-500"
+              }`}
+            >
+              {voiceEnabled ? "On" : "Off"}
+            </button>
+          </div>
+
+          {/* Auto-send Toggle */}
+          <div className="flex items-center justify-between">
+            <span>Auto-send voice</span>
+            <button
+              onClick={() => setAutoSend((v) => !v)}
+              className={`px-2 py-0.5 rounded-full text-xs ${
+                autoSend
+                  ? "bg-amber-500 text-white"
+                  : "bg-stone-200 text-stone-500"
+              }`}
+            >
+              {autoSend ? "On" : "Off"}
+            </button>
+          </div>
+
+          {/* Silence timeout */}
+          <div>
+            <div className="flex justify-between mb-1">
+              <span>Silence delay</span>
+              <span>{(silenceTimeout / 1000).toFixed(1)}s</span>
+            </div>
+            <input
+              type="range"
+              min={1000}
+              max={10000}
+              step={500}
+              value={silenceTimeout}
+              onChange={(e) => setSilenceTimeout(Number(e.target.value))}
+              className="w-full accent-amber-600"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Input row */}
       <div className="flex gap-2">

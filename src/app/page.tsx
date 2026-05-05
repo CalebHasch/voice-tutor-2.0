@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import TopicSelector from "@/app/components/TopicSelector";
 import ChatWindow from "@/app/components/ChatWindow";
+import { useTTS } from "@/hooks/useTTS";
 import { Message, InterruptPayload, TOPICS } from "@/app/types/tutor";
 
 export default function Home() {
@@ -19,6 +20,9 @@ export default function Home() {
   const [subtopicTotal, setSubtopicTotal] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionTotal, setQuestionTotal] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const { speak, stop } = useTTS();
+  const lastSpokenIndexRef = useRef<number | null>(null);
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
 
   const callApi = useCallback(
@@ -128,6 +132,9 @@ export default function Home() {
 
   function handleSend(text: string) {
     if (!text.trim()) return;
+
+    stop();
+
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     callApi(text);
   }
@@ -168,6 +175,27 @@ export default function Home() {
     hasSentInitial.current = true;
     callApiRef.current();
   }, [topic]);
+
+  useEffect(() => {
+    if (!voiceEnabled) {
+      stop();
+      return;
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return;
+
+    const lastIndex = messages.length - 1;
+
+    if (lastMessage.role !== "assistant") return;
+    if (lastSpokenIndexRef.current === lastIndex) return;
+
+    lastSpokenIndexRef.current = lastIndex;
+
+    const cleanText = lastMessage.content.replace(/[#*_`]/g, "");
+
+    speak(cleanText);
+  }, [messages, voiceEnabled]);
 
   if (!topic) return <TopicSelector onSelect={setTopic} />;
 
@@ -234,6 +262,8 @@ export default function Home() {
           subtopicTotal={subtopicTotal}
           questionIndex={questionIndex}
           questionTotal={questionTotal}
+          voiceEnabled={voiceEnabled}
+          setVoiceEnabled={setVoiceEnabled}
         />
       </div>
     </div>
