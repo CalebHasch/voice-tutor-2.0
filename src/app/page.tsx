@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import TopicSelector from "@/app/components/TopicSelector";
 import ChatWindow from "@/app/components/ChatWindow";
 import { useTTS } from "@/hooks/useTTS";
+import { useTypewriter } from "@/hooks/useTypewriter";
 import { Message, InterruptPayload, TOPICS } from "@/app/types/tutor";
 
 export default function Home() {
@@ -22,13 +23,23 @@ export default function Home() {
   const [questionTotal, setQuestionTotal] = useState(0);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const { speak, stop } = useTTS();
-  const lastSpokenIndexRef = useRef<number | null>(null);
+  const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
 
   const callApi = useCallback(
     async (resume?: string | string[]) => {
       setIsLoading(true);
       setInterrupt(null);
+      cancelTypewriter();
+
+      function splitIntoSentences(text: string): string[] {
+        return (
+          text
+            .replace(/\s+/g, " ")
+            .trim()
+            .match(/[^.!?]+[.!?]?/g) || []
+        );
+      }
 
       const body =
         resume !== undefined ? { threadId, resume } : { topic, threadId };
@@ -57,6 +68,50 @@ export default function Home() {
         return;
       }
 
+      async function deliverMessage(content: string, score?: Message["score"]) {
+        const sentences = splitIntoSentences(content);
+
+        // Add an empty assistant message
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "", score },
+        ]);
+
+        let accumulated = "";
+
+        for (const sentence of sentences) {
+          const cleanSentence = sentence.trim();
+          if (!cleanSentence) continue;
+
+          const speechPromise = voiceEnabled
+            ? speak(cleanSentence)
+            : Promise.resolve();
+
+          const typingPromise = type(sentence, (typedSentence) => {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+
+              if (last?.role === "assistant") {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content:
+                    accumulated + (accumulated ? " " : "") + typedSentence,
+                };
+              }
+
+              return updated;
+            });
+          });
+
+          // Wait for BOTH to finish before next sentence
+          await Promise.all([speechPromise, typingPromise]);
+
+          accumulated = accumulated
+            ? accumulated + " " + cleanSentence
+            : cleanSentence;
+        }
+      }
       setIsLoading(false);
 
       if (data.error) {
@@ -75,7 +130,6 @@ export default function Home() {
       if (data.interrupted) {
         const payload = data.interrupt as InterruptPayload;
         lastInterruptRef.current = payload;
-        setInterrupt(payload);
 
         // Update progress info from graph state
         if (data.subtopics?.length > 0) {
@@ -90,49 +144,31 @@ export default function Home() {
 
         if (payload.type === "question") {
           if (payload.questionType === "main") {
-            // Incoming main question — start a fresh thread
-            setMessages([{ role: "assistant", content: payload.question }]);
-          } else {
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: payload.question },
-            ]);
+            setMessages([]);
           }
+          await deliverMessage(payload.question);
         } else if (payload.type === "subtopic-selection") {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: payload.message },
-          ]);
+          await deliverMessage(payload.message);
         } else if (payload.type === "feedback") {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: payload.message,
-              score: payload.score,
-            },
-          ]);
+          await deliverMessage(payload.message, payload.score);
         } else if (payload.type === "incomplete-response") {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: payload.message },
-          ]);
+          await deliverMessage(payload.message);
         }
+
+        setInterrupt(payload);
       } else if (data.step === "session-complete") {
         setSessionComplete(true);
         setRecommendations(data.recommendations ?? []);
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: data.sessionFeedback },
-        ]);
+        await deliverMessage(data.sessionFeedback);
       }
     },
-    [topic, threadId],
+    [topic, threadId, voiceEnabled, speak, cancelTypewriter, type],
   );
 
   function handleSend(text: string) {
     if (!text.trim()) return;
 
+    cancelTypewriter();
     stop();
 
     setMessages((prev) => [...prev, { role: "user", content: text }]);
@@ -176,27 +212,6 @@ export default function Home() {
     hasSentInitial.current = true;
     callApiRef.current();
   }, [topic]);
-
-  useEffect(() => {
-    if (!voiceEnabled) {
-      stop();
-      return;
-    }
-
-    const lastMessage = messages[messages.length - 1];
-    if (!lastMessage) return;
-
-    const lastIndex = messages.length - 1;
-
-    if (lastMessage.role !== "assistant") return;
-    if (lastSpokenIndexRef.current === lastIndex) return;
-
-    lastSpokenIndexRef.current = lastIndex;
-
-    const cleanText = lastMessage.content.replace(/[#*_`]/g, "");
-
-    speak(cleanText);
-  }, [messages, voiceEnabled, speak, stop]);
 
   if (!topic) return <TopicSelector onSelect={setTopic} />;
 

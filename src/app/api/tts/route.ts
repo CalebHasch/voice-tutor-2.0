@@ -1,24 +1,29 @@
-import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-export async function POST(req: NextRequest) {
-  const { text } = await req.json();
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const text = searchParams.get("text");
+
+  if (!text) {
+    return new Response("Missing text", { status: 400 });
+  }
 
   const response = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts",
-    voice: "nova",
+    voice: "alloy",
     input: text,
   });
 
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const audioBuffer = Buffer.from(await response.arrayBuffer());
 
-  return new Response(buffer, {
+  return new Response(audioBuffer, {
     headers: {
       "Content-Type": "audio/mpeg",
+      "Cache-Control": "no-store",
     },
   });
 }

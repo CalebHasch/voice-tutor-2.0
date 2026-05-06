@@ -11,22 +11,18 @@ export function useTTS() {
   }, []);
 
   const speak = useCallback(
-    async (text: string) => {
-      stop();
+    (text: string): Promise<void> => {
+      return new Promise((resolve) => {
+        stop();
 
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        body: JSON.stringify({ text }),
-        headers: { "Content-Type": "application/json" },
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}`);
+        audioRef.current = audio;
+
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+
+        audio.play().catch(console.error);
       });
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-
-      const audio = new Audio(url);
-      audioRef.current = audio;
-
-      audio.play().catch(console.error);
     },
     [stop],
   );

@@ -29,6 +29,16 @@ export const TOPICS = [
     description: "Hooks, state, components & modern patterns",
   },
   {
+    id: "physics",
+    label: "Physics",
+    description: "An intro to classical mechanics and electromagnetism",
+  },
+  {
+    id: "indonesian-language",
+    label: "Indonesian Language",
+    description: "Basic grammar, vocabulary & conversation skills",
+  },
+  {
     id: "human-anatomy",
     label: "Human Anatomy",
     description: "Systems, structures & physiological function",
