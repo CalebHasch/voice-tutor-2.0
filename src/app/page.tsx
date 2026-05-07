@@ -26,6 +26,7 @@ export default function Home() {
   const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
   const shouldClearNextRef = useRef(false);
+  const handleContinueRef = useRef<(shouldClear: boolean) => void>(() => {});
 
   const callApi = useCallback(
     async (resume?: string | string[]) => {
@@ -154,7 +155,7 @@ export default function Home() {
           shouldClearNextRef.current =
             payload.score === "correct" || payload.consecutiveWrongCount >= 2;
           await deliverMessage(payload.message, payload.score);
-          handleContinue(false);
+          handleContinueRef.current(false);
           return;
         } else if (payload.type === "clarification-prompt") {
           await deliverMessage(payload.message);
@@ -220,8 +221,10 @@ export default function Home() {
   }
 
   const callApiRef = useRef(callApi);
+
   useEffect(() => {
     callApiRef.current = callApi;
+    handleContinueRef.current = handleContinue;
   });
 
   const hasSentInitial = useRef(false);
