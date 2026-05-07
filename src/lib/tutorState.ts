@@ -7,9 +7,15 @@ export type FollowUp = {
   score: "correct" | "partial" | "incorrect";
 };
 
+export type ClarificationEntry = {
+  question: string;
+  answer: string;
+};
+
 export type MainQuestion = FollowUp & {
   consecutiveWrongCount: number;
   followups: FollowUp[];
+  clarifications: ClarificationEntry[];
 };
 
 export type Subtopic = {
@@ -23,6 +29,7 @@ export type TutorStep =
   | "asking-main"
   | "asking-followup"
   | "question-feedback"
+  | "asking-clarification"
   | "session-complete";
 
 export const TutorAnnotation = Annotation.Root({
@@ -40,6 +47,16 @@ export const TutorAnnotation = Annotation.Root({
   subtopics: Annotation<Subtopic[]>({
     reducer: (_, next) => next,
     default: () => [],
+  }),
+  pendingClarification: Annotation<string>({
+    reducer: (_, next) => next,
+    default: () => "",
+  }),
+  pendingGoto: Annotation<
+    "next-question" | "next-subtopic" | "session-end" | "followup" | ""
+  >({
+    reducer: (_, next) => next,
+    default: () => "",
   }),
   currentSubtopicIndex: Annotation<number>,
   currentMainQuestionIndex: Annotation<number>,

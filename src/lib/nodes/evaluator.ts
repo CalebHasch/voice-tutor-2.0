@@ -99,64 +99,31 @@ Student's response: ${userResponse}`,
     }
   }
 
-  function getNextStep(): {
-    goto: string;
-    nextSubtopicIdx: number;
-    nextQuestionIdx: number;
-    step: TutorState["step"];
-  } {
+  function getPendingGoto(): TutorState["pendingGoto"] {
     const totalSubtopics = updatedSubtopics.length;
     const totalMainQuestions =
       updatedSubtopics[currentSubtopicIndex].mainQuestions.length;
 
-    const advanceQuestion = () => {
-      if (currentMainQuestionIndex + 1 < totalMainQuestions) {
-        return {
-          goto: "sessionRouter",
-          nextSubtopicIdx: currentSubtopicIndex,
-          nextQuestionIdx: currentMainQuestionIndex + 1,
-          step: "asking-main" as const,
-        };
-      } else if (currentSubtopicIndex + 1 < totalSubtopics) {
-        return {
-          goto: "sessionRouter",
-          nextSubtopicIdx: currentSubtopicIndex + 1,
-          nextQuestionIdx: 0,
-          step: "asking-main" as const,
-        };
-      } else {
-        return {
-          goto: "sessionEnd",
-          nextSubtopicIdx: currentSubtopicIndex,
-          nextQuestionIdx: currentMainQuestionIndex,
-          step: "session-complete" as const,
-        };
-      }
-    };
-
-    if (!isFollowup) {
-      if (score === "correct") return advanceQuestion();
-      return {
-        goto: "followupGenerator",
-        nextSubtopicIdx: currentSubtopicIndex,
-        nextQuestionIdx: currentMainQuestionIndex,
-        step: "asking-followup" as const,
-      };
-    } else {
-      if (score === "correct") return advanceQuestion();
+    // Followup that was wrong — check consecutive count
+    if (isFollowup && score !== "correct") {
       q.consecutiveWrongCount += 1;
-      if (q.consecutiveWrongCount >= 2) return advanceQuestion();
-      return {
-        goto: "followupGenerator",
-        nextSubtopicIdx: currentSubtopicIndex,
-        nextQuestionIdx: currentMainQuestionIndex,
-        step: "asking-followup" as const,
-      };
+      if (q.consecutiveWrongCount < 2) return "followup";
+      // >= 2 wrong in a row — force advance (fall through)
     }
+
+    // Main question that was wrong/partial — needs a followup
+    if (!isFollowup && score !== "correct") {
+      return "followup";
+    }
+
+    // Advance: next question, next subtopic, or end
+    if (currentMainQuestionIndex + 1 < totalMainQuestions)
+      return "next-question";
+    if (currentSubtopicIndex + 1 < totalSubtopics) return "next-subtopic";
+    return "session-end";
   }
 
-  // ── Routing logic (unchanged) ────────────────────────────────────
-  const { goto, nextSubtopicIdx, nextQuestionIdx, step } = getNextStep();
+  const pendingGoto = getPendingGoto();
   const isEncouragement =
     isFollowup && score !== "correct" && q.consecutiveWrongCount >= 2;
 
@@ -171,13 +138,13 @@ Student's response: ${userResponse}`,
       : feedback,
   });
 
+  // Always route to clarificationAsker — sessionRouter handles onward routing
   return new Command({
-    goto,
+    goto: "clarificationAsker",
     update: {
       subtopics: updatedSubtopics,
-      currentSubtopicIndex: nextSubtopicIdx,
-      currentMainQuestionIndex: nextQuestionIdx,
-      step,
+      pendingGoto,
+      step: "question-feedback",
     },
   });
 }

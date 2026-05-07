@@ -14,6 +14,44 @@ export async function sessionRouterNode(state: TutorState): Promise<Command> {
     );
   }
 
+  // ── Coming from clarificationAsker (skip or after clarification answer) ──
+  if (state.step === "asking-clarification") {
+    switch (state.pendingGoto) {
+      case "followup":
+        return new Command({
+          goto: "followupGenerator",
+          update: { step: "asking-followup" },
+        });
+
+      case "session-end":
+        return new Command({
+          goto: "sessionEnd",
+          update: { step: "session-complete" },
+        });
+
+      case "next-subtopic":
+        return new Command({
+          goto: "sessionRouter",
+          update: {
+            step: "asking-main",
+            currentSubtopicIndex: currentSubtopicIndex + 1,
+            currentMainQuestionIndex: 0,
+          },
+        });
+
+      case "next-question":
+      default:
+        return new Command({
+          goto: "sessionRouter",
+          update: {
+            step: "asking-main",
+            currentSubtopicIndex: currentSubtopicIndex,
+            currentMainQuestionIndex: currentMainQuestionIndex + 1,
+          },
+        });
+    }
+  }
+
   // ── Ask main question ────────────────────────────────────────────
   if (state.step === "asking-main") {
     const userResponse: string = interrupt({

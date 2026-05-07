@@ -20,6 +20,8 @@ export type InterruptPayload =
       consecutiveWrongCount: number;
       message: string;
     }
+  | { type: "clarification-prompt"; message: string }
+  | { type: "clarification-answer"; answer: string }
   | { type: "incomplete-response"; message: string };
 
 export const TOPICS = [

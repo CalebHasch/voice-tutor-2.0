@@ -69,14 +69,17 @@ export default function ChatWindow({
   questionTotal,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const prevMessageCountRef = useRef(messages.length);
+
   const [fading, setFading] = useState(false);
 
   const isSubtopicSelection = interrupt?.type === "subtopic-selection";
   const isQuestion = interrupt?.type === "question";
   const isFeedback = interrupt?.type === "feedback";
+  const isClarificationPrompt = interrupt?.type === "clarification-prompt";
   const isIncomplete = interrupt?.type === "incomplete-response";
-  const needsContinue = isFeedback || isIncomplete;
-  const prevMessageCountRef = useRef(messages.length);
+  const needsContinue =
+    isIncomplete || interrupt?.type === "clarification-answer";
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -109,6 +112,7 @@ export default function ChatWindow({
       onContinue(false);
     }
   }
+
   return (
     <>
       <style>{`
@@ -300,6 +304,18 @@ export default function ChatWindow({
           </div>
         )}
 
+        {/* Clarification prompt */}
+        {isClarificationPrompt && !isLoading && (
+          <div className="message-appear pl-9 pt-1">
+            <button
+              onClick={() => onContinue(false)}
+              className="text-xs text-stone-400 hover:text-stone-600 underline transition-colors"
+            >
+              Skip — next question →
+            </button>
+          </div>
+        )}
+
         {/* Session complete — recommendations */}
         {sessionComplete && recommendations.length > 0 && (
           <div className="message-appear pl-9 space-y-2 pt-2">
@@ -320,14 +336,14 @@ export default function ChatWindow({
         <div ref={bottomRef} />
       </div>
 
-      {/* Input — hidden during selection, feedback, incomplete, or session end */}
+      {/* Input */}
       {!isSubtopicSelection &&
         !isFeedback &&
         !isIncomplete &&
         !sessionComplete && (
           <ChatInput
             onSend={onSend}
-            disabled={!isQuestion}
+            disabled={!isQuestion && !isClarificationPrompt}
             isLoading={isLoading}
             voiceEnabled={voiceEnabled}
             setVoiceEnabled={setVoiceEnabled}

@@ -21,10 +21,11 @@ export default function Home() {
   const [subtopicTotal, setSubtopicTotal] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionTotal, setQuestionTotal] = useState(0);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const { speak, stop } = useTTS();
   const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
+  const shouldClearNextRef = useRef(false);
 
   const callApi = useCallback(
     async (resume?: string | string[]) => {
@@ -150,7 +151,15 @@ export default function Home() {
         } else if (payload.type === "subtopic-selection") {
           await deliverMessage(payload.message);
         } else if (payload.type === "feedback") {
+          shouldClearNextRef.current =
+            payload.score === "correct" || payload.consecutiveWrongCount >= 2;
           await deliverMessage(payload.message, payload.score);
+          handleContinue(false);
+          return;
+        } else if (payload.type === "clarification-prompt") {
+          await deliverMessage(payload.message);
+        } else if (payload.type === "clarification-answer") {
+          await deliverMessage(payload.answer ?? (payload as any).answer); // eslint-disable-line @typescript-eslint/no-explicit-any
         } else if (payload.type === "incomplete-response") {
           await deliverMessage(payload.message);
         }
@@ -176,6 +185,15 @@ export default function Home() {
   }
 
   function handleContinue(shouldClear: boolean) {
+    if (interrupt?.type === "clarification-prompt") {
+      callApi("__skip__");
+      return;
+    } else if (interrupt?.type === "clarification-answer") {
+      if (shouldClearNextRef.current) setMessages([]);
+      callApi("continue");
+      return;
+    }
+
     if (shouldClear) setMessages([]);
     callApi("continue");
   }
