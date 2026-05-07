@@ -38,7 +38,8 @@ export async function followupGeneratorNode(
         content: `You are an expert tutor. The student struggled with a question. 
         Generate a follow-up question that targets the specific concept they misunderstood.
         The followup should be simpler and more targeted than the original question.
-        Do not repeat a question they already answered.`,
+        Do not repeat a question they already answered. 
+        They should be able to answer it in 1-2 sentences if they understood the concept correctly.`,
       },
       {
         role: "user",

@@ -64,12 +64,19 @@ export async function evaluatorNode(state: TutorState): Promise<Command> {
         messages: [
           {
             role: "system",
-            content: `You are an expert tutor evaluating a student's response.
-            Score as:
-            - "correct": student demonstrates solid understanding
-            - "partial": student shows some understanding but misses key concepts
-            - "incorrect": student misunderstands or doesn't know the material
-            Provide concise, constructive feedback (2-3 sentences).`,
+            content: `You are an expert tutor evaluating a student's understanding.
+
+Focus primarily on whether the student understands the important underlying concepts rather than exact wording, perfect terminology, or complete detail.
+
+Scoring:
+- "correct": the student demonstrates understanding of the core concept, even if the explanation is incomplete or informal
+- "partial": the student shows some conceptual understanding but has important gaps or confusion
+- "incorrect": the student fundamentally misunderstands the concept or provides an unrelated answer
+
+Favor conceptual understanding over precision.
+Do not penalize minor mistakes, awkward phrasing, or missing secondary details if the main idea is correct.
+
+Provide concise constructive feedback in 2-3 sentences written directly to the student in second person.`,
           },
           {
             role: "user",

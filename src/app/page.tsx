@@ -21,7 +21,7 @@ export default function Home() {
   const [subtopicTotal, setSubtopicTotal] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionTotal, setQuestionTotal] = useState(0);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const { speak, stop } = useTTS();
   const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
@@ -167,6 +167,7 @@ export default function Home() {
 
         setInterrupt(payload);
       } else if (data.step === "session-complete") {
+        setMessages([]);
         setSessionComplete(true);
         setRecommendations(data.recommendations ?? []);
         await deliverMessage(data.sessionFeedback);

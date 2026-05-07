@@ -57,7 +57,7 @@ export async function responseValidatorNode(
   interrupt({
     type: "incomplete-response",
     message:
-      "Your response seemed to get cut off! Try answering again — you can increase the silence timeout in the settings, or type your answer instead.",
+      "Your response seemed to get cut off! Try answering again — you can increase the silence timeout in the settings, turn off auto-send mode, or type your answer instead.",
   });
 
   return new Command({

@@ -50,7 +50,7 @@ export async function subtopicSelectorNode(
   const selectedNames: string[] = interrupt({
     type: "subtopic-selection",
     message:
-      "Here are the subtopics for this session. Please select 1–4 to focus on.",
+      "Here are the subtopics for this session. Please select 1 to 4 to focus on.",
     subtopics: subtopicNames,
   });
 

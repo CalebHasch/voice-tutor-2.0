@@ -3,7 +3,8 @@ import { Command, interrupt } from "@langchain/langgraph";
 export async function clarificationAskerNode(): Promise<Command> {
   const userInput: string = interrupt({
     type: "clarification-prompt",
-    message: "Do you have any questions about this topic before moving on?",
+    message:
+      "Do you have any questions about this concept or should we move on to the next question?",
   });
 
   if (userInput === "__skip__") {
