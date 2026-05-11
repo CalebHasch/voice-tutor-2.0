@@ -5,6 +5,7 @@ import TopicSelector from "@/app/components/TopicSelector";
 import ChatWindow from "@/app/components/ChatWindow";
 import { useTTS } from "@/hooks/useTTS";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Message, InterruptPayload, TOPICS } from "@/app/types/tutor";
 
 export default function Home() {
@@ -21,7 +22,10 @@ export default function Home() {
   const [subtopicTotal, setSubtopicTotal] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionTotal, setQuestionTotal] = useState(0);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useLocalStorage(
+    "mentorai_voice_enabled",
+    true,
+  );
   const { prepareSpeech, stop } = useTTS();
   const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);

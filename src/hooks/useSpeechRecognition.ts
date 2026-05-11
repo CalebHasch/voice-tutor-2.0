@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocalStorage } from "./useLocalStorage";
 
 declare global {
   interface Window {
@@ -26,7 +27,10 @@ export function useSpeechRecognition(
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [silenceTimeout, setSilenceTimeout] = useState(3000); // default 3s
+  const [silenceTimeout, setSilenceTimeout] = useLocalStorage(
+    "mentorai_silence_timeout",
+    3000,
+  ); // default 3s
   const silenceTimeoutRef = useRef(3000);
 
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);

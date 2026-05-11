@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -21,7 +22,7 @@ export default function ChatInput({
   setVoiceEnabled,
 }: ChatInputProps) {
   const [typedInput, setTypedInput] = useState("");
-  const [autoSend, setAutoSend] = useState(true);
+  const [autoSend, setAutoSend] = useLocalStorage("mentorai_auto_send", true);
   const [showSettings, setShowSettings] = useState(false);
 
   const {
