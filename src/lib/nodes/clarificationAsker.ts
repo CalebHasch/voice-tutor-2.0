@@ -4,7 +4,7 @@ export async function clarificationAskerNode(): Promise<Command> {
   const userInput: string = interrupt({
     type: "clarification-prompt",
     message:
-      "Do you have any questions about this concept or should we move on to the next question?",
+      "Do you have any questions about this concept or should we move on?",
   });
 
   if (userInput === "__skip__") {

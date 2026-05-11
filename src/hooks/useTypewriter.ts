@@ -17,14 +17,18 @@ export function useTypewriter() {
     (
       text: string,
       onUpdate: (currentText: string) => void,
-      wordsPerMinute = 160,
+      totalDurationMs: number,
     ): Promise<void> => {
       return new Promise((resolve) => {
         cancel();
         cancelledRef.current = false;
 
         const words = text.split(" ");
-        const msPerWord = (60 / wordsPerMinute) * 1000;
+
+        // fallback if duration unavailable
+        const msPerWord = totalDurationMs
+          ? totalDurationMs / words.length
+          : 120;
 
         let index = 0;
         let current = "";
@@ -46,16 +50,16 @@ export function useTypewriter() {
 
           index++;
 
-          const jitter = (Math.random() - 0.5) * (msPerWord * 0.3);
+          const jitter = (Math.random() - 0.5) * 20;
 
           const punctuationPause =
             word.endsWith(".") || word.endsWith("?") || word.endsWith("!")
-              ? msPerWord * 1.5
+              ? 80
               : 0;
 
           timeoutRef.current = setTimeout(
             typeNext,
-            isLast ? 0 : msPerWord + jitter + punctuationPause,
+            isLast ? 0 : Math.max(20, msPerWord + jitter + punctuationPause),
           );
         }
 

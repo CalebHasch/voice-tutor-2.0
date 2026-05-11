@@ -24,6 +24,15 @@ export type InterruptPayload =
   | { type: "clarification-answer"; answer: string }
   | { type: "incomplete-response"; message: string };
 
+export type PreparedSpeech = {
+  audio: HTMLAudioElement;
+  durationMs: number;
+  play: () => {
+    started: Promise<void>;
+    finished: Promise<void>;
+  };
+};
+
 export const TOPICS = [
   {
     id: "react",

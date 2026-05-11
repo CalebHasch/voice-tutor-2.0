@@ -16,13 +16,14 @@ export async function GET(req: Request) {
     model: "gpt-4o-mini-tts",
     voice: "alloy",
     input: text,
+    response_format: "wav",
   });
 
   const audioBuffer = Buffer.from(await response.arrayBuffer());
 
   return new Response(audioBuffer, {
     headers: {
-      "Content-Type": "audio/mpeg",
+      "Content-Type": "audio/wav",
       "Cache-Control": "no-store",
     },
   });

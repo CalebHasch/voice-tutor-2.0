@@ -1,4 +1,5 @@
 import { useRef, useCallback } from "react";
+import { PreparedSpeech } from "@/app/types/tutor";
 
 export function useTTS() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -6,26 +7,73 @@ export function useTTS() {
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+
+      // cleanup blob URL
+      URL.revokeObjectURL(audioRef.current.src);
+
       audioRef.current = null;
     }
   }, []);
 
-  const speak = useCallback(
-    (text: string): Promise<void> => {
-      return new Promise((resolve) => {
-        stop();
+  const prepareSpeech = useCallback(
+    async (text: string) => {
+      const response = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
 
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(text)}`);
-        audioRef.current = audio;
+      const blob = await response.blob();
 
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
+      const url = URL.createObjectURL(blob);
 
-        audio.play().catch(console.error);
+      const audio = new Audio();
+      audio.preload = "auto";
+      audio.src = url;
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onloadedmetadata = () => resolve();
+        audio.onerror = () => reject();
       });
+
+      const prepared: PreparedSpeech = {
+        audio,
+        durationMs: audio.duration * 1000,
+
+        play: () => {
+          stop();
+
+          audioRef.current = audio;
+
+          const started = new Promise<void>((resolve) => {
+            audio.onplaying = () => resolve();
+          });
+
+          const finished = new Promise<void>((resolve) => {
+            audio.onended = () => {
+              URL.revokeObjectURL(url);
+              resolve();
+            };
+
+            audio.onerror = () => {
+              URL.revokeObjectURL(url);
+              resolve();
+            };
+          });
+
+          audio.play().catch(console.error);
+
+          return {
+            started,
+            finished,
+          };
+        },
+      };
+
+      return prepared;
     },
     [stop],
   );
 
-  return { speak, stop };
+  return {
+    prepareSpeech,
+    stop,
+  };
 }

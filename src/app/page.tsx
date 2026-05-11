@@ -22,7 +22,7 @@ export default function Home() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionTotal, setQuestionTotal] = useState(0);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const { speak, stop } = useTTS();
+  const { prepareSpeech, stop } = useTTS();
   const { type, cancel: cancelTypewriter } = useTypewriter();
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
   const shouldClearNextRef = useRef(false);
@@ -35,12 +35,35 @@ export default function Home() {
       cancelTypewriter();
 
       function splitIntoSentences(text: string): string[] {
-        return (
+        const sentences =
           text
             .replace(/\s+/g, " ")
             .trim()
-            .match(/[^.!?]+[.!?]?/g) || []
-        );
+            .match(/[^.!?]+[.!?]+(\s|$)/g) || [];
+
+        const chunks: string[] = [];
+
+        let current = "";
+
+        for (const sentence of sentences) {
+          const next = current
+            ? `${current} ${sentence.trim()}`
+            : sentence.trim();
+
+          // target chunk size
+          if (next.split(" ").length > 18) {
+            if (current) chunks.push(current);
+            current = sentence.trim();
+          } else {
+            current = next;
+          }
+        }
+
+        if (current) {
+          chunks.push(current);
+        }
+
+        return chunks;
       }
 
       const body =
@@ -81,33 +104,64 @@ export default function Home() {
 
         let accumulated = "";
 
-        for (const sentence of sentences) {
+        let nextSpeechPromise =
+          voiceEnabled && sentences.length > 0
+            ? prepareSpeech(sentences[0])
+            : null;
+
+        for (let i = 0; i < sentences.length; i++) {
+          const sentence = sentences[i];
           const cleanSentence = sentence.trim();
+
           if (!cleanSentence) continue;
 
-          const speechPromise = voiceEnabled
-            ? speak(cleanSentence)
-            : Promise.resolve();
+          // get already-preloading audio
+          const preparedSpeech = nextSpeechPromise
+            ? await nextSpeechPromise
+            : null;
 
-          const typingPromise = type(sentence, (typedSentence) => {
-            setMessages((prev) => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
+          // preload next audio while current sentence is being typed and spoken
+          if (voiceEnabled && i + 1 < sentences.length) {
+            nextSpeechPromise = prepareSpeech(sentences[i + 1]);
+          }
 
-              if (last?.role === "assistant") {
-                updated[updated.length - 1] = {
-                  ...last,
-                  content:
-                    accumulated + (accumulated ? " " : "") + typedSentence,
-                };
-              }
+          let speechFinished = Promise.resolve();
 
-              return updated;
-            });
-          });
+          let durationMs = 0;
 
-          // Wait for BOTH to finish before next sentence
-          await Promise.all([speechPromise, typingPromise]);
+          if (preparedSpeech) {
+            durationMs = preparedSpeech.durationMs;
+
+            const playback = preparedSpeech.play();
+
+            await playback.started;
+
+            speechFinished = playback.finished;
+          }
+
+          const typingPromise = type(
+            sentence,
+            (typedSentence) => {
+              setMessages((prev) => {
+                const updated = [...prev];
+
+                const last = updated[updated.length - 1];
+
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    content:
+                      accumulated + (accumulated ? " " : "") + typedSentence,
+                  };
+                }
+
+                return updated;
+              });
+            },
+            durationMs,
+          );
+
+          await Promise.all([speechFinished, typingPromise]);
 
           accumulated = accumulated
             ? accumulated + " " + cleanSentence
@@ -173,7 +227,7 @@ export default function Home() {
         await deliverMessage(data.sessionFeedback);
       }
     },
-    [topic, threadId, voiceEnabled, speak, cancelTypewriter, type],
+    [topic, threadId, voiceEnabled, prepareSpeech, cancelTypewriter, type],
   );
 
   function handleSend(text: string) {
