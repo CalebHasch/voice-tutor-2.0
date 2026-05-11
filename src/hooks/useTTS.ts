@@ -16,61 +16,63 @@ export function useTTS() {
     }
   }, []);
 
-  const prepareSpeech = useCallback(
-    async (text: string) => {
-      const response = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
+  const prepareSpeech = useCallback(async (text: string) => {
+    const response = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
 
-      const blob = await response.blob();
+    const blob = await response.blob();
 
-      const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
 
-      const audio = new Audio();
-      audio.preload = "auto";
-      audio.src = url;
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = url;
 
-      await new Promise<void>((resolve, reject) => {
-        audio.onloadedmetadata = () => resolve();
-        audio.onerror = () => reject();
-      });
+    await new Promise<void>((resolve, reject) => {
+      audio.onloadedmetadata = () => resolve();
+      audio.onerror = () => reject();
+    });
 
-      const prepared: PreparedSpeech = {
-        audio,
-        durationMs: audio.duration * 1000,
+    const prepared: PreparedSpeech = {
+      audio,
+      durationMs: audio.duration * 1000,
 
-        play: () => {
-          stop();
+      play: () => {
+        audioRef.current = audio;
 
-          audioRef.current = audio;
+        const started = new Promise<void>((resolve) => {
+          audio.onplaying = () => resolve();
+        });
 
-          const started = new Promise<void>((resolve) => {
-            audio.onplaying = () => resolve();
-          });
+        const finished = new Promise<void>((resolve) => {
+          audio.onended = () => {
+            resolve();
 
-          const finished = new Promise<void>((resolve) => {
-            audio.onended = () => {
+            // delay URL revocation slightly to ensure audio can play without issues in all browsers
+            setTimeout(() => {
               URL.revokeObjectURL(url);
-              resolve();
-            };
-
-            audio.onerror = () => {
-              URL.revokeObjectURL(url);
-              resolve();
-            };
-          });
-
-          audio.play().catch(console.error);
-
-          return {
-            started,
-            finished,
+            }, 1000);
           };
-        },
-      };
 
-      return prepared;
-    },
-    [stop],
-  );
+          audio.onerror = () => {
+            resolve();
+
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+            }, 1000);
+          };
+        });
+
+        audio.play().catch(console.error);
+
+        return {
+          started,
+          finished,
+        };
+      },
+    };
+
+    return prepared;
+  }, []);
 
   return {
     prepareSpeech,

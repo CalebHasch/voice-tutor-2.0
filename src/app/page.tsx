@@ -27,6 +27,7 @@ export default function Home() {
   const lastInterruptRef = useRef<InterruptPayload | null>(null);
   const shouldClearNextRef = useRef(false);
   const handleContinueRef = useRef<(shouldClear: boolean) => void>(() => {});
+  const playbackIdRef = useRef(0);
 
   const callApi = useCallback(
     async (resume?: string | string[]) => {
@@ -34,197 +35,291 @@ export default function Home() {
       setInterrupt(null);
       cancelTypewriter();
 
-      function splitIntoSentences(text: string): string[] {
-        const sentences =
-          text
-            .replace(/\s+/g, " ")
-            .trim()
-            .match(/[^.!?]+[.!?]+(\s|$)/g) || [];
+      const playbackId = ++playbackIdRef.current;
 
-        const chunks: string[] = [];
-
-        let current = "";
-
-        for (const sentence of sentences) {
-          const next = current
-            ? `${current} ${sentence.trim()}`
-            : sentence.trim();
-
-          // target chunk size
-          if (next.split(" ").length > 18) {
-            if (current) chunks.push(current);
-            current = sentence.trim();
-          } else {
-            current = next;
-          }
-        }
-
-        if (current) {
-          chunks.push(current);
-        }
-
-        return chunks;
-      }
-
-      const body =
-        resume !== undefined ? { threadId, resume } : { topic, threadId };
-
-      let data: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+      let playbackStarted = false;
 
       try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-        data = await res.json();
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setIsLoading(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "Sorry, a network error occurred. Please try again.",
-          },
-        ]);
-        setInterrupt(lastInterruptRef.current);
-        return;
-      }
+        function splitIntoSentences(text: string): string[] {
+          const normalized = text.replace(/\s+/g, " ").trim();
 
-      async function deliverMessage(content: string, score?: Message["score"]) {
-        const sentences = splitIntoSentences(content);
+          const sentences = normalized.match(/[^.!?]+(?:[.!?]+|$)/g) || [];
 
-        // Add an empty assistant message
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "", score },
-        ]);
+          const chunks: string[] = [];
 
-        let accumulated = "";
+          let current = "";
 
-        let nextSpeechPromise =
-          voiceEnabled && sentences.length > 0
-            ? prepareSpeech(sentences[0])
-            : null;
+          for (const rawSentence of sentences) {
+            const sentence = rawSentence.trim();
 
-        for (let i = 0; i < sentences.length; i++) {
-          const sentence = sentences[i];
-          const cleanSentence = sentence.trim();
+            if (!sentence) continue;
 
-          if (!cleanSentence) continue;
+            const next = current ? `${current} ${sentence}` : sentence;
 
-          // get already-preloading audio
-          const preparedSpeech = nextSpeechPromise
-            ? await nextSpeechPromise
-            : null;
+            if (next.split(" ").length > 18) {
+              if (current) {
+                chunks.push(current);
+              }
 
-          // preload next audio while current sentence is being typed and spoken
-          if (voiceEnabled && i + 1 < sentences.length) {
-            nextSpeechPromise = prepareSpeech(sentences[i + 1]);
+              current = sentence;
+            } else {
+              current = next;
+            }
           }
 
-          let speechFinished = Promise.resolve();
-
-          let durationMs = 0;
-
-          if (preparedSpeech) {
-            durationMs = preparedSpeech.durationMs;
-
-            const playback = preparedSpeech.play();
-
-            await playback.started;
-
-            speechFinished = playback.finished;
+          if (current) {
+            chunks.push(current);
           }
 
-          const typingPromise = type(
-            sentence,
-            (typedSentence) => {
-              setMessages((prev) => {
-                const updated = [...prev];
+          return chunks;
+        }
 
-                const last = updated[updated.length - 1];
+        const body =
+          resume !== undefined ? { threadId, resume } : { topic, threadId };
 
-                if (last?.role === "assistant") {
-                  updated[updated.length - 1] = {
-                    ...last,
-                    content:
-                      accumulated + (accumulated ? " " : "") + typedSentence,
-                  };
+        let data: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          }
+
+          data = await res.json();
+        } catch (err) {
+          console.error("Fetch error:", err);
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "Sorry, a network error occurred. Please try again.",
+            },
+          ]);
+
+          setInterrupt(lastInterruptRef.current);
+
+          return;
+        }
+
+        async function deliverMessage(
+          content: string,
+          score?: Message["score"],
+        ) {
+          const sentences = splitIntoSentences(content);
+
+          let accumulated = "";
+
+          let messageCreated = false;
+
+          let nextSpeechPromise =
+            voiceEnabled && sentences.length > 0
+              ? prepareSpeech(sentences[0]).catch((err) => {
+                  console.error("Initial TTS preload failed:", err);
+
+                  return null;
+                })
+              : null;
+
+          if (!voiceEnabled) {
+            playbackStarted = true;
+            setIsLoading(false);
+          }
+
+          if (!voiceEnabled && !messageCreated) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: "",
+                score,
+              },
+            ]);
+
+            messageCreated = true;
+          }
+
+          for (let i = 0; i < sentences.length; i++) {
+            if (playbackId !== playbackIdRef.current) {
+              return;
+            }
+
+            const sentence = sentences[i];
+
+            const cleanSentence = sentence.trim();
+
+            if (!cleanSentence) continue;
+
+            // get already preloaded speech
+            let preparedSpeech = null;
+
+            try {
+              preparedSpeech = nextSpeechPromise
+                ? await nextSpeechPromise
+                : null;
+            } catch (err) {
+              console.error("TTS preload failed:", err);
+            }
+
+            // preload NEXT speech immediately
+            if (voiceEnabled && i + 1 < sentences.length) {
+              nextSpeechPromise = prepareSpeech(sentences[i + 1]).catch(
+                (err) => {
+                  console.error("Next TTS preload failed:", err);
+
+                  return null;
+                },
+              );
+            }
+
+            let speechFinished = Promise.resolve();
+
+            let durationMs = 0;
+
+            if (preparedSpeech) {
+              durationMs = preparedSpeech.durationMs;
+
+              const playback = preparedSpeech.play();
+
+              await playback.started;
+
+              if (!messageCreated) {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "assistant",
+                    content: "",
+                    score,
+                  },
+                ]);
+
+                messageCreated = true;
+              }
+
+              if (i === 0) {
+                playbackStarted = true;
+                setIsLoading(false);
+              }
+
+              speechFinished = playback.finished;
+            }
+
+            const typingPromise = type(
+              sentence,
+              (typedSentence) => {
+                if (playbackId !== playbackIdRef.current) {
+                  return;
                 }
 
-                return updated;
-              });
-            },
-            durationMs,
-          );
+                setMessages((prev) => {
+                  const updated = [...prev];
 
-          await Promise.all([speechFinished, typingPromise]);
+                  const last = updated[updated.length - 1];
 
-          accumulated = accumulated
-            ? accumulated + " " + cleanSentence
-            : cleanSentence;
-        }
-      }
-      setIsLoading(false);
+                  if (last?.role === "assistant") {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      content:
+                        accumulated + (accumulated ? " " : "") + typedSentence,
+                    };
+                  }
 
-      if (data.error) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content:
-              "Sorry, something went wrong. Please try sending your message again.",
-          },
-        ]);
-        setInterrupt(lastInterruptRef.current);
-        return;
-      }
+                  return updated;
+                });
+              },
+              durationMs,
+            );
 
-      if (data.interrupted) {
-        const payload = data.interrupt as InterruptPayload;
-        lastInterruptRef.current = payload;
+            await Promise.all([speechFinished, typingPromise]);
 
-        // Update progress info from graph state
-        if (data.subtopics?.length > 0) {
-          const sidx = data.currentSubtopicIndex ?? 0;
-          const qidx = data.currentMainQuestionIndex ?? 0;
-          setSubtopicIndex(sidx);
-          setSubtopicTotal(data.subtopics.length);
-          setSubtopicName(data.subtopics[sidx]?.name ?? "");
-          setQuestionIndex(qidx);
-          setQuestionTotal(data.subtopics[sidx]?.mainQuestions?.length ?? 0);
-        }
-
-        if (payload.type === "question") {
-          if (payload.questionType === "main") {
-            setMessages([]);
+            accumulated = accumulated
+              ? accumulated + " " + cleanSentence
+              : cleanSentence;
           }
-          await deliverMessage(payload.question);
-        } else if (payload.type === "subtopic-selection") {
-          await deliverMessage(payload.message);
-        } else if (payload.type === "feedback") {
-          shouldClearNextRef.current =
-            payload.score === "correct" || payload.consecutiveWrongCount >= 2;
-          await deliverMessage(payload.message, payload.score);
-          handleContinueRef.current(false);
-          return;
-        } else if (payload.type === "clarification-prompt") {
-          await deliverMessage(payload.message);
-        } else if (payload.type === "clarification-answer") {
-          await deliverMessage(payload.answer ?? (payload as any).answer); // eslint-disable-line @typescript-eslint/no-explicit-any
-        } else if (payload.type === "incomplete-response") {
-          await deliverMessage(payload.message);
         }
 
-        setInterrupt(payload);
-      } else if (data.step === "session-complete") {
-        setMessages([]);
-        setSessionComplete(true);
-        setRecommendations(data.recommendations ?? []);
-        await deliverMessage(data.sessionFeedback);
+        if (data.error) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content:
+                "Sorry, something went wrong. Please try sending your message again.",
+            },
+          ]);
+
+          setInterrupt(lastInterruptRef.current);
+
+          return;
+        }
+
+        if (data.interrupted) {
+          const payload = data.interrupt as InterruptPayload;
+
+          lastInterruptRef.current = payload;
+
+          if (data.subtopics?.length > 0) {
+            const sidx = data.currentSubtopicIndex ?? 0;
+
+            const qidx = data.currentMainQuestionIndex ?? 0;
+
+            setSubtopicIndex(sidx);
+
+            setSubtopicTotal(data.subtopics.length);
+
+            setSubtopicName(data.subtopics[sidx]?.name ?? "");
+
+            setQuestionIndex(qidx);
+
+            setQuestionTotal(data.subtopics[sidx]?.mainQuestions?.length ?? 0);
+          }
+
+          if (payload.type === "question") {
+            if (payload.questionType === "main") {
+              setMessages([]);
+            }
+
+            await deliverMessage(payload.question);
+          } else if (payload.type === "subtopic-selection") {
+            await deliverMessage(payload.message);
+          } else if (payload.type === "feedback") {
+            shouldClearNextRef.current =
+              payload.score === "correct" || payload.consecutiveWrongCount >= 2;
+
+            await deliverMessage(payload.message, payload.score);
+
+            handleContinueRef.current(false);
+
+            return;
+          } else if (payload.type === "clarification-prompt") {
+            await deliverMessage(payload.message);
+          } else if (payload.type === "clarification-answer") {
+            await deliverMessage(payload.answer ?? (payload as any).answer); // eslint-disable-line @typescript-eslint/no-explicit-any
+          } else if (payload.type === "incomplete-response") {
+            await deliverMessage(payload.message);
+          }
+
+          setInterrupt(payload);
+        } else if (data.step === "session-complete") {
+          setMessages([]);
+
+          setSessionComplete(true);
+
+          setRecommendations(data.recommendations ?? []);
+
+          await deliverMessage(data.sessionFeedback);
+        }
+      } finally {
+        if (!playbackStarted) {
+          setIsLoading(false);
+        }
       }
     },
     [topic, threadId, voiceEnabled, prepareSpeech, cancelTypewriter, type],
