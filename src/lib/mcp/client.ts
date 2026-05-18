@@ -80,8 +80,8 @@ class MCPClient {
     const response = await this.callTool<MCPToolResponse<CanvasCourse[]>>(
       "get_canvas_template_courses",
     );
-
-    return response.structuredContent?.result ?? [];
+    // Limit to 7 courses until we grab the courses by student
+    return (response?.structuredContent?.result ?? []).slice(0, 7);
   }
 
   async getModules(courseId: string): Promise<CanvasModule[]> {

@@ -1,15 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import TopicSelector from "@/app/components/TopicSelector";
+import CourseSelector from "./components/CourseSelector";
+import ModuleSelector from "@/app/components/ModuleSelector";
 import ChatWindow from "@/app/components/ChatWindow";
 import { useTTS } from "@/hooks/useTTS";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Message, InterruptPayload, TOPICS } from "@/app/types/tutor";
+import { Message, InterruptPayload } from "@/app/types/tutor";
+import { CanvasCourse, CanvasModule } from "./types/canvas";
 
 export default function Home() {
-  const [topic, setTopic] = useState<string | null>(null);
+  const [courses, setCourses] = useState<CanvasCourse[]>([]);
+  const [modules, setModules] = useState<CanvasModule[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<CanvasCourse | null>(
+    null,
+  );
+  const [selectedModule, setSelectedModule] = useState<CanvasModule | null>(
+    null,
+  );
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [threadId] = useState(() => crypto.randomUUID());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,7 +89,9 @@ export default function Home() {
         }
 
         const body =
-          resume !== undefined ? { threadId, resume } : { topic, threadId };
+          resume !== undefined
+            ? { threadId, resume }
+            : { topic: selectedModule?.title, threadId };
 
         let data: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -326,7 +338,14 @@ export default function Home() {
         }
       }
     },
-    [topic, threadId, voiceEnabled, prepareSpeech, cancelTypewriter, type],
+    [
+      selectedModule?.title,
+      threadId,
+      voiceEnabled,
+      prepareSpeech,
+      cancelTypewriter,
+      type,
+    ],
   );
 
   function handleSend(text: string) {
@@ -351,6 +370,30 @@ export default function Home() {
 
     if (shouldClear) setMessages([]);
     callApi("continue");
+  }
+
+  async function handleCourseSelect(course: CanvasCourse) {
+    setSelectedCourse(course);
+    setModules([]);
+
+    try {
+      const res = await fetch(`/api/courses/${course.id}/modules`);
+
+      if (!res.ok) {
+        console.error("Failed to load modules");
+        return;
+      }
+
+      const data = await res.json();
+
+      console.log("Modules data:", data);
+
+      if (data.success) {
+        setModules(data.modules);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   function handleSubtopicToggle(name: string) {
@@ -381,16 +424,56 @@ export default function Home() {
     handleContinueRef.current = handleContinue;
   });
 
+  useEffect(() => {
+    async function loadCourses() {
+      try {
+        const res = await fetch("/api/courses");
+        const data = await res.json();
+
+        if (data.success) {
+          setCourses(data.courses);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setCoursesLoading(false);
+      }
+    }
+
+    loadCourses();
+  }, []);
+
   const hasSentInitial = useRef(false);
   useEffect(() => {
-    if (!topic || hasSentInitial.current) return;
+    if (!selectedModule || hasSentInitial.current) return;
     hasSentInitial.current = true;
     callApiRef.current();
-  }, [topic]);
+  }, [selectedModule]);
 
-  if (!topic) return <TopicSelector onSelect={setTopic} />;
+  if (!selectedCourse) {
+    return (
+      <CourseSelector
+        courses={courses}
+        loading={coursesLoading}
+        onSelect={handleCourseSelect}
+      />
+    );
+  }
 
-  const topicLabel = TOPICS.find((t) => t.id === topic)?.label ?? topic;
+  if (!selectedModule) {
+    return (
+      <ModuleSelector
+        course={selectedCourse}
+        modules={modules}
+        onBack={() => {
+          setSelectedCourse(null);
+          setModules([]);
+        }}
+        onSelect={setSelectedModule}
+      />
+    );
+  }
+  const topicLabel = `${selectedCourse.title} · ${selectedModule.title}`;
 
   return (
     <div
@@ -421,12 +504,16 @@ export default function Home() {
           </div>
           <button
             onClick={() => {
-              setTopic(null);
+              setSelectedCourse(null);
+              setSelectedModule(null);
+              setModules([]);
+
               setMessages([]);
               setInterrupt(null);
               setSessionComplete(false);
               setSelectedSubtopics([]);
               setSubtopicName("");
+
               hasSentInitial.current = false;
             }}
             className="text-xs text-stone-400 hover:text-stone-600 transition-colors border border-stone-200 rounded-full px-3 py-1"
