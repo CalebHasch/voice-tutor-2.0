@@ -30,3 +30,15 @@ export type CanvasModule = {
   items?: unknown[];
   [key: string]: unknown;
 };
+
+export interface DocumentChunk {
+  id: string;
+  document_id: string;
+  content: string;
+  chunk_index?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SearchChunksResponse {
+  result: DocumentChunk[];
+}

@@ -3,6 +3,7 @@ import {
   CanvasCourse,
   CanvasModule,
   MCPToolResponse,
+  DocumentChunk,
 } from "./types";
 
 class MCPClient {
@@ -92,6 +93,23 @@ class MCPClient {
         include_item_content: false,
       },
     );
+
+    return response.structuredContent?.result ?? [];
+  }
+
+  async searchDocumentChunks(
+    queries: string[],
+    limit = 10,
+  ): Promise<DocumentChunk[]> {
+    const response = await this.callTool<MCPToolResponse<DocumentChunk[]>>(
+      "search_document_chunks",
+      {
+        queries,
+        limit,
+      },
+    );
+
+    console.log(JSON.stringify(response, null, 2));
 
     return response.structuredContent?.result ?? [];
   }
