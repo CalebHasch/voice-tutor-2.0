@@ -1,5 +1,6 @@
 import { openai } from "@/lib/openai";
 import { TutorState } from "@/lib/tutorState";
+import { formatSourceMaterial } from "@/utils/formatSourceMaterial";
 import { Command, interrupt } from "@langchain/langgraph";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { withRetry } from "@/lib/withRetry";
@@ -57,6 +58,10 @@ export async function evaluatorNode(state: TutorState): Promise<Command> {
           .userResponse
       : currentQuestion.userResponse;
 
+    const sourceMaterialText = formatSourceMaterial(
+      currentSubtopic.sourceMaterial ?? [],
+    );
+
     const result = await withRetry(async () => {
       const response = await openai.chat.completions.create({
         model: "gpt-4o-2024-08-06",
@@ -65,11 +70,12 @@ export async function evaluatorNode(state: TutorState): Promise<Command> {
           {
             role: "system",
             content: `You are an expert tutor evaluating a student's understanding.
+${sourceMaterialText ? `Use the provided course source material as your reference for what correct understanding looks like. Evaluate whether the student's response reflects the concepts taught in the course.${sourceMaterialText}` : ""}
 
 Focus primarily on whether the student understands the important underlying concepts rather than exact wording, perfect terminology, or complete detail.
 
 Scoring:
-- "correct": the student demonstrates understanding of the core concept, even if the explanation is incomplete or informal
+- "correct": the student demonstrates understanding of the core concept
 - "partial": the student shows some conceptual understanding but has important gaps or confusion
 - "incorrect": the student fundamentally misunderstands the concept or provides an unrelated answer
 
