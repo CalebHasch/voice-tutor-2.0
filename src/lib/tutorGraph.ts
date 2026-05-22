@@ -4,6 +4,7 @@ import {
   subtopicGeneratorNode,
   subtopicSelectorNode,
 } from "./nodes/subtopicGenerator";
+import { contextFetcherNode } from "./nodes/contextFetcherNode";
 import { mainQuestionGeneratorNode } from "./nodes/mainQuestionGenerator";
 import {
   responseValidatorNode,
@@ -21,6 +22,7 @@ const checkpointer = new MemorySaver();
 export const tutorGraph = new StateGraph(TutorAnnotation)
   .addNode("subtopicGenerator", subtopicGeneratorNode)
   .addNode("subtopicSelector", subtopicSelectorNode)
+  .addNode("contextFetcher", contextFetcherNode)
   .addNode("mainQuestionGenerator", mainQuestionGeneratorNode)
 
   // Decision routing nodes
@@ -48,14 +50,15 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
   // Initial flow
   .addEdge(START, "subtopicGenerator")
   .addEdge("subtopicGenerator", "subtopicSelector")
-  .addEdge("subtopicSelector", "mainQuestionGenerator")
+  .addEdge("subtopicSelector", "contextFetcher")
+  .addEdge("contextFetcher", "mainQuestionGenerator")
 
   // Question flow (handled by sessionRouter)
   .addEdge("mainQuestionGenerator", "sessionRouter")
   .addEdge("followupGenerator", "sessionRouter")
   .addEdge("clarificationResponder", "sessionRouter")
 
-  // evaluator and sessionFeedback use Command for dynamic routing (no edges needed)
+  // other nodes use Command for dynamic routing (no edges needed)
 
   .addEdge("sessionEnd", END)
   .compile({ checkpointer });

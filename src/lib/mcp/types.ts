@@ -30,13 +30,20 @@ export type CanvasModule = {
   items?: unknown[];
   [key: string]: unknown;
 };
-
 export interface DocumentChunk {
-  id: string;
+  id?: string;
+  chunk_id?: string;
   document_id: string;
+  import_id: string;
   content: string;
-  chunk_index?: number;
-  metadata?: Record<string, unknown>;
+  summary: string;
+  keywords: string[];
+  document_title: string;
+  file_name: string;
+  file_type: string;
+  document_type: string;
+  similarity: number;
+  rrf_score: number;
 }
 
 export interface SearchChunksResponse {

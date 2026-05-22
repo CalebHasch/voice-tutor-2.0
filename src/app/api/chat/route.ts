@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       // Initial invocation — start a new session
       const inputState: Partial<TutorState> = {
         topic: body.topic,
+        moduleItems: body.moduleItems,
         step: "subtopic-generation",
         subtopics: [],
         currentSubtopicIndex: 0,

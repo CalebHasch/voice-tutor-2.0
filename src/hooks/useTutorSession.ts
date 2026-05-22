@@ -5,12 +5,14 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useMessageDelivery } from "@/hooks/useMessageDelivery";
 import { sendTutorMessage } from "@/app/services/sendTutorMessage";
 import { InterruptPayload, Message } from "@/app/types/tutor";
+import { CanvasModuleItem } from "@/app/types/canvas";
 
 interface UseTutorSessionProps {
   topic?: string;
+  moduleItems?: CanvasModuleItem[];
 }
 
-export function useTutorSession({ topic }: UseTutorSessionProps) {
+export function useTutorSession({ topic, moduleItems }: UseTutorSessionProps) {
   const [threadId] = useState(() => crypto.randomUUID());
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -61,7 +63,9 @@ export function useTutorSession({ topic }: UseTutorSessionProps) {
       cancelPlayback();
 
       const body =
-        resume !== undefined ? { threadId, resume } : { topic, threadId };
+        resume !== undefined
+          ? { threadId, resume }
+          : { topic, moduleItems, threadId };
 
       let data: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -157,7 +161,14 @@ export function useTutorSession({ topic }: UseTutorSessionProps) {
         await deliverMessage(data.sessionFeedback);
       }
     },
-    [topic, threadId, deliverMessage, cancelTypewriter, cancelPlayback],
+    [
+      topic,
+      moduleItems,
+      threadId,
+      deliverMessage,
+      cancelTypewriter,
+      cancelPlayback,
+    ],
   );
 
   function handleSend(text: string) {

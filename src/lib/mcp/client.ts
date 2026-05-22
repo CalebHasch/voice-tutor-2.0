@@ -81,8 +81,10 @@ class MCPClient {
     const response = await this.callTool<MCPToolResponse<CanvasCourse[]>>(
       "get_canvas_template_courses",
     );
-    // Limit to 7 courses until we grab the courses by student
-    return (response?.structuredContent?.result ?? []).slice(0, 7);
+    const all = response?.structuredContent?.result ?? [];
+    // Temporary: only show courses that have been fully processed
+    const PROCESSED_COURSE_IDS = ["211"];
+    return all.filter((course) => PROCESSED_COURSE_IDS.includes(course.id));
   }
 
   async getModules(courseId: string): Promise<CanvasModule[]> {
@@ -97,6 +99,16 @@ class MCPClient {
     return response.structuredContent?.result ?? [];
   }
 
+  // This grabs all chunks for a given document
+  async getChunksForDocument(documentId: string): Promise<DocumentChunk[]> {
+    const response = await this.callTool<MCPToolResponse<DocumentChunk[]>>(
+      "get_chunks_for_document",
+      { document_id: documentId },
+    );
+    return response.structuredContent?.result ?? [];
+  }
+
+  // This performs a semantic search across all documents and returns the most relevant chunks
   async searchDocumentChunks(
     queries: string[],
     limit = 10,

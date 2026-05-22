@@ -18,8 +18,13 @@ export default function Home() {
     null,
   );
   const [coursesLoading, setCoursesLoading] = useState(true);
+  const CONTENT_TYPES_TO_KEEP = ["wikipage"];
   const tutorSession = useTutorSession({
     topic: selectedModule?.title,
+    moduleItems:
+      selectedModule?.module_items.filter((item) =>
+        CONTENT_TYPES_TO_KEEP.includes(item.content_type),
+      ) ?? [],
   });
 
   async function handleCourseSelect(course: CanvasCourse) {

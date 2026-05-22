@@ -1,4 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
+import { DocumentChunk } from "./mcp/types";
+import { CanvasModuleItem } from "@/app/types/canvas";
 
 export type FollowUp = {
   question: string;
@@ -20,6 +22,8 @@ export type MainQuestion = FollowUp & {
 
 export type Subtopic = {
   name: string;
+  documentId: string;
+  sourceMaterial: DocumentChunk[];
   mainQuestions: MainQuestion[];
 };
 
@@ -45,6 +49,10 @@ export const TutorAnnotation = Annotation.Root({
     default: () => [],
   }),
   subtopics: Annotation<Subtopic[]>({
+    reducer: (_, next) => next,
+    default: () => [],
+  }),
+  moduleItems: Annotation<CanvasModuleItem[]>({
     reducer: (_, next) => next,
     default: () => [],
   }),

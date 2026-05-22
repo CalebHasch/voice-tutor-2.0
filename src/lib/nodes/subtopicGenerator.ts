@@ -1,40 +1,39 @@
-import { openai } from "@/lib/openai";
 import { Subtopic, TutorState } from "@/lib/tutorState";
 import { interrupt } from "@langchain/langgraph";
-import { zodResponseFormat } from "openai/helpers/zod";
-import { z } from "zod";
 
-const SubtopicResponseSchema = z.object({
-  subtopics: z.array(z.string()).min(4).max(8),
-});
+const ALLOWED_CONTENT_TYPES = ["wikipage"];
+const EXCLUDED_TITLE_PATTERNS = [
+  /^introduction/i,
+  /^summary/i,
+  /^check for understanding/i,
+  /^technical lesson/i,
+  /^overview/i,
+  /^lab/i,
+  /^quiz/i,
+  /^discussion/i,
+  /^practice/i,
+  /^assessments/i,
+];
+
+function isSubstantiveLesson(title: string): boolean {
+  return !EXCLUDED_TITLE_PATTERNS.some((pattern) => pattern.test(title.trim()));
+}
 
 export async function subtopicGeneratorNode(
   state: TutorState,
 ): Promise<Partial<TutorState>> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-2024-08-06",
-    response_format: zodResponseFormat(
-      SubtopicResponseSchema,
-      "subtopic_response",
-    ),
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert tutor. Given a topic, return 4-8 subtopic names 
-        that comprehensively cover the topic for a learner.`,
-      },
-      { role: "user", content: `Topic: ${state.topic}` },
-    ],
-  });
-
-  const parsed = SubtopicResponseSchema.parse(
-    JSON.parse(response.choices[0].message.content ?? "{}"),
-  );
-
-  const allSubtopics = parsed.subtopics.map((name) => ({
-    name,
-    mainQuestions: [],
-  }));
+  const allSubtopics: Subtopic[] = state.moduleItems
+    .filter(
+      (item) =>
+        ALLOWED_CONTENT_TYPES.includes(item.content_type) &&
+        isSubstantiveLesson(item.title),
+    )
+    .map((item) => ({
+      name: item.title,
+      documentId: item.document_id,
+      sourceMaterial: [],
+      mainQuestions: [],
+    }));
 
   return {
     allSubtopics,
