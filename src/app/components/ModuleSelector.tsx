@@ -36,7 +36,7 @@ export default function ModuleSelector({
         }
       `}</style>
 
-      <div className="w-full max-w-3xl space-y-8 font-body">
+      <div className="w-full max-w-6xl space-y-8 font-body">
         <div className="text-center space-y-3">
           <button
             onClick={onBack}
@@ -54,12 +54,12 @@ export default function ModuleSelector({
           </h1>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {modules.map((module) => (
             <button
               key={module.id}
               onClick={() => onSelect(module)}
-              className="module-card w-full rounded-2xl px-6 py-5 text-left"
+              className="module-card rounded-2xl px-6 py-5 text-left"
             >
               <div className="font-display text-lg text-stone-800">
                 {module.title}

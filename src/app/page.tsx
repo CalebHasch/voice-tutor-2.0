@@ -27,6 +27,21 @@ export default function Home() {
       ) ?? [],
   });
 
+  function cleanCourseTitle(title: string) {
+    return title.replace(/^\s*\[Template\]\s*/i, "").trim();
+  }
+
+  function isValidModuleTitle(title: string) {
+    const normalized = title.trim().toLowerCase();
+
+    const startsWithModule = normalized.startsWith("module");
+
+    const isSummaryOrAssessment =
+      normalized.includes("summary") || normalized.includes("assessment");
+
+    return startsWithModule && !isSummaryOrAssessment;
+  }
+
   async function handleCourseSelect(course: CanvasCourse) {
     setSelectedCourse(course);
     setModules([]);
@@ -35,7 +50,14 @@ export default function Home() {
       const data = await fetchModules(course.id);
 
       if (data.success) {
-        setModules(data.modules);
+        const cleanedModules = data.modules
+          .filter((module: CanvasModule) => isValidModuleTitle(module.title))
+          .map((module: CanvasModule) => ({
+            ...module,
+            title: module.title.trim(),
+          }));
+
+        setModules(cleanedModules);
       }
     } catch (err) {
       console.error(err);
@@ -48,7 +70,12 @@ export default function Home() {
         const data = await fetchCourses();
 
         if (data.success) {
-          setCourses(data.courses);
+          const cleanedCourses = data.courses.map((course: CanvasCourse) => ({
+            ...course,
+            title: cleanCourseTitle(course.title),
+          }));
+
+          setCourses(cleanedCourses);
         }
       } catch (err) {
         console.error(err);
