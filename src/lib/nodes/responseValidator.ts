@@ -50,7 +50,7 @@ export async function responseValidatorNode(
   });
 
   if (isComplete) {
-    return new Command({ goto: "evaluator" });
+    return new Command({ goto: "interruptDetector" });
   }
 
   // Incomplete — notify user then hand off to retry node

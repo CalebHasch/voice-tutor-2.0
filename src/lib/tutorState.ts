@@ -56,7 +56,15 @@ export const TutorAnnotation = Annotation.Root({
     reducer: (_, next) => next,
     default: () => [],
   }),
+  clarificationSource: Annotation<"mid-question" | "end-of-thread">({
+    reducer: (_, next) => next,
+    default: () => "end-of-thread",
+  }),
   pendingClarification: Annotation<string>({
+    reducer: (_, next) => next,
+    default: () => "",
+  }),
+  pendingClarificationAnswer: Annotation<string>({
     reducer: (_, next) => next,
     default: () => "",
   }),
