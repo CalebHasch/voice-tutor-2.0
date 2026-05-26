@@ -16,13 +16,14 @@ export async function sessionRouterNode(state: TutorState): Promise<Command> {
 
   // ── Coming from clarificationAsker (skip or after clarification answer) ──
   if (state.step === "asking-clarification") {
-    switch (state.pendingGoto) {
-      case "followup":
-        return new Command({
-          goto: "followupGenerator",
-          update: { step: "asking-followup" },
-        });
+    if (state.pendingGoto === "followup") {
+      return new Command({
+        goto: "followupGenerator",
+        update: { step: "asking-followup" },
+      });
+    }
 
+    switch (state.pendingGoto) {
       case "session-end":
         return new Command({
           goto: "sessionEnd",

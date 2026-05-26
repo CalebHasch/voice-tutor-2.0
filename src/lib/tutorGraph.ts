@@ -40,7 +40,7 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
   })
   .addNode("evaluator", evaluatorNode, { ends: ["clarificationAsker"] })
   .addNode("clarificationAsker", clarificationAskerNode, {
-    ends: ["sessionRouter", "clarificationResponder"],
+    ends: ["sessionRouter", "clarificationResponder", "sessionEnd"],
   })
   .addNode("clarificationResponder", clarificationResponderNode)
 
