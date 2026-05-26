@@ -5,6 +5,7 @@ import { CanvasCourse, CanvasModule } from "@/app/types/canvas";
 interface ModuleSelectorProps {
   course: CanvasCourse;
   modules: CanvasModule[];
+  loading: boolean;
   onSelect: (module: CanvasModule) => void;
   onBack: () => void;
 }
@@ -12,9 +13,34 @@ interface ModuleSelectorProps {
 export default function ModuleSelector({
   course,
   modules,
+  loading,
   onSelect,
   onBack,
 }: ModuleSelectorProps) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-stone-50 px-4">
+        <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
+
+        .font-display { font-family: 'Lora', serif; }
+        .font-body { font-family: 'DM Sans', sans-serif; }
+      `}</style>
+
+        <div className="text-center space-y-4 font-body">
+          <p className="text-xs uppercase tracking-[0.2em] text-stone-400">
+            {course.title}
+          </p>
+
+          <h1 className="font-display text-3xl text-stone-800">
+            Loading modules...
+          </h1>
+
+          <div className="w-12 h-12 border-4 border-stone-200 border-t-[#c2784a] rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen flex flex-col items-center bg-stone-50 px-4 py-12">
       <style>{`

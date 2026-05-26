@@ -18,6 +18,7 @@ export default function Home() {
     null,
   );
   const [coursesLoading, setCoursesLoading] = useState(true);
+  const [modulesLoading, setModulesLoading] = useState(false);
   const CONTENT_TYPES_TO_KEEP = ["wikipage"];
   const tutorSession = useTutorSession({
     topic: selectedModule?.title,
@@ -45,6 +46,7 @@ export default function Home() {
   async function handleCourseSelect(course: CanvasCourse) {
     setSelectedCourse(course);
     setModules([]);
+    setModulesLoading(true);
 
     try {
       const data = await fetchModules(course.id);
@@ -61,6 +63,8 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setModulesLoading(false);
     }
   }
 
@@ -102,6 +106,7 @@ export default function Home() {
       <ModuleSelector
         course={selectedCourse}
         modules={modules}
+        loading={modulesLoading}
         onBack={() => {
           setSelectedCourse(null);
           setModules([]);
