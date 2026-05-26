@@ -151,13 +151,14 @@ Student's response: ${userResponse}`,
       : feedback,
   });
 
-  // Always route to clarificationAsker — sessionRouter handles onward routing
+  const skipClarification = pendingGoto === "followup";
+
   return new Command({
-    goto: "clarificationAsker",
+    goto: skipClarification ? "sessionRouter" : "clarificationAsker",
     update: {
       subtopics: updatedSubtopics,
       pendingGoto,
-      step: "question-feedback",
+      step: "asking-clarification",
     },
   });
 }

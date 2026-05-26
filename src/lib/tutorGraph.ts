@@ -10,10 +10,14 @@ import {
   responseValidatorNode,
   responseRetryNode,
 } from "./nodes/responseValidator";
+import { interruptDetectorNode } from "./nodes/interruptDetector";
 import { sessionRouterNode } from "./nodes/sessionRouter";
 import { evaluatorNode } from "./nodes/evaluator";
 import { clarificationAskerNode } from "./nodes/clarificationAsker";
-import { clarificationResponderNode } from "./nodes/clarificationResponder";
+import {
+  clarificationResponderNode,
+  clarificationLLMNode,
+} from "./nodes/clarificationResponder";
 import { followupGeneratorNode } from "./nodes/followupGenerator";
 import { sessionEndNode } from "./nodes/sessionEnd";
 
@@ -27,7 +31,10 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
 
   // Decision routing nodes
   .addNode("responseValidator", responseValidatorNode, {
-    ends: ["evaluator", "responseRetry"],
+    ends: ["interruptDetector", "responseRetry"],
+  })
+  .addNode("interruptDetector", interruptDetectorNode, {
+    ends: ["evaluator", "clarificationLLM"],
   })
   .addNode("responseRetry", responseRetryNode, { ends: ["evaluator"] })
   .addNode("sessionRouter", sessionRouterNode, {
@@ -40,9 +47,12 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
   })
   .addNode("evaluator", evaluatorNode, { ends: ["clarificationAsker"] })
   .addNode("clarificationAsker", clarificationAskerNode, {
-    ends: ["sessionRouter", "clarificationResponder"],
+    ends: ["sessionRouter", "clarificationLLM", "sessionEnd"],
   })
-  .addNode("clarificationResponder", clarificationResponderNode)
+  .addNode("clarificationLLM", clarificationLLMNode)
+  .addNode("clarificationResponder", clarificationResponderNode, {
+    ends: ["sessionRouter"],
+  })
 
   .addNode("followupGenerator", followupGeneratorNode)
   .addNode("sessionEnd", sessionEndNode)
@@ -56,7 +66,7 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
   // Question flow (handled by sessionRouter)
   .addEdge("mainQuestionGenerator", "sessionRouter")
   .addEdge("followupGenerator", "sessionRouter")
-  .addEdge("clarificationResponder", "sessionRouter")
+  .addEdge("clarificationLLM", "clarificationResponder")
 
   // other nodes use Command for dynamic routing (no edges needed)
 

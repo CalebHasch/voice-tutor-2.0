@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     moduleItems: [],
     allSubtopics: [],
     subtopics: body.subtopics,
+    clarificationSource: "end-of-thread",
     pendingClarification: "",
     pendingGoto: "",
     currentSubtopicIndex: 0,

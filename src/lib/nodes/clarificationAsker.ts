@@ -15,10 +15,12 @@ export async function clarificationAskerNode(): Promise<Command> {
   }
 
   return new Command({
-    goto: "clarificationResponder",
+    goto: "clarificationLLM",
     update: {
       step: "asking-clarification",
+
       pendingClarification: userInput,
+      clarificationSource: "end-of-thread",
     },
   });
 }
