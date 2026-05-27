@@ -68,6 +68,13 @@ export const TutorAnnotation = Annotation.Root({
     reducer: (_, next) => next,
     default: () => "",
   }),
+  pendingEvaluation: Annotation<{
+    score: "correct" | "partial" | "incorrect";
+    feedback: string;
+  } | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
   pendingGoto: Annotation<
     "next-question" | "next-subtopic" | "session-end" | "followup" | ""
   >({

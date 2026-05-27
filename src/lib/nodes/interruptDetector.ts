@@ -49,7 +49,7 @@ export async function interruptDetectorNode(
   });
 
   if (!isClarification) {
-    return new Command({ goto: "evaluator" });
+    return new Command({ goto: "evaluatorLLM" });
   } else {
     return new Command({
       goto: "clarificationLLM",

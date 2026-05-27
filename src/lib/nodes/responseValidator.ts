@@ -99,7 +99,7 @@ export async function responseRetryNode(state: TutorState): Promise<Command> {
   }
 
   return new Command({
-    goto: "evaluator",
+    goto: "evaluatorLLM",
     update: { subtopics: updatedSubtopics },
   });
 }

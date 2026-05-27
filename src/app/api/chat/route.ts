@@ -38,11 +38,15 @@ export async function POST(req: Request) {
     // Note: return 200 so the frontend gets JSON, not an HTML error page
   }
 
+  const loggableSubtopics = result.subtopics.map(
+    ({ sourceMaterial: _, ...rest }) => rest,
+  );
+
   console.log("\n===== TUTOR GRAPH STATE =====");
   console.log("step:", result.step);
   console.log("currentSubtopicIndex:", result.currentSubtopicIndex);
   console.log("currentMainQuestionIndex:", result.currentMainQuestionIndex);
-  console.log("subtopics:", JSON.stringify(result.subtopics, null, 2));
+  console.log("subtopics:", JSON.stringify(loggableSubtopics, null, 2));
 
   // If the graph hit an interrupt, surface it to the frontend
   const interrupted = (result as any).__interrupt__; // eslint-disable-line @typescript-eslint/no-explicit-any

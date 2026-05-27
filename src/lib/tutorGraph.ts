@@ -12,7 +12,7 @@ import {
 } from "./nodes/responseValidator";
 import { interruptDetectorNode } from "./nodes/interruptDetector";
 import { sessionRouterNode } from "./nodes/sessionRouter";
-import { evaluatorNode } from "./nodes/evaluator";
+import { evaluatorLLMNode, evaluatorNode } from "./nodes/evaluator";
 import { clarificationAskerNode } from "./nodes/clarificationAsker";
 import {
   clarificationResponderNode,
@@ -34,9 +34,9 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
     ends: ["interruptDetector", "responseRetry"],
   })
   .addNode("interruptDetector", interruptDetectorNode, {
-    ends: ["evaluator", "clarificationLLM"],
+    ends: ["evaluatorLLM", "clarificationLLM"],
   })
-  .addNode("responseRetry", responseRetryNode, { ends: ["evaluator"] })
+  .addNode("responseRetry", responseRetryNode, { ends: ["evaluatorLLM"] })
   .addNode("sessionRouter", sessionRouterNode, {
     ends: [
       "responseValidator",
@@ -45,7 +45,10 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
       "sessionRouter",
     ],
   })
-  .addNode("evaluator", evaluatorNode, { ends: ["clarificationAsker"] })
+  .addNode("evaluatorLLM", evaluatorLLMNode)
+  .addNode("evaluator", evaluatorNode, {
+    ends: ["clarificationAsker", "sessionRouter"],
+  })
   .addNode("clarificationAsker", clarificationAskerNode, {
     ends: ["sessionRouter", "clarificationLLM", "sessionEnd"],
   })
@@ -67,6 +70,7 @@ export const tutorGraph = new StateGraph(TutorAnnotation)
   .addEdge("mainQuestionGenerator", "sessionRouter")
   .addEdge("followupGenerator", "sessionRouter")
   .addEdge("clarificationLLM", "clarificationResponder")
+  .addEdge("evaluatorLLM", "evaluator")
 
   // other nodes use Command for dynamic routing (no edges needed)
 
